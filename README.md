@@ -1,5 +1,7 @@
 # Couchside
 
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/RnR4ZOR/Couchside)
+
 Watch-party rooms: name a room, paste a stream link (YouTube, Twitch, Kick, Vimeo, .m3u8, .mp4 or any embed code), add backups and share the link with friends.
 
 ## Hosting on Netlify
