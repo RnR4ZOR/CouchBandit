@@ -28,6 +28,9 @@ function kindOf(u) {
   if (h.endsWith("kick.com")) return { kind: "kick" };
   if (h.endsWith("vimeo.com")) return { kind: "vimeo" };
   if (/\.m3u8($|\?)/i.test(u.pathname + u.search)) return { kind: "hls" };
+  if (/\.mpd($|\?)/i.test(u.pathname + u.search)) return { kind: "dash" };
+  if (/\.flv($|\?)/i.test(u.pathname)) return { kind: "flv" };
+  if (/\.ts($|\?)/i.test(u.pathname)) return { kind: "mpegts" };
   if (/\.(mp4|webm|ogg|mov)($|\?)/i.test(u.pathname)) return { kind: "file" };
   return { kind: "page" };
 }
@@ -86,6 +89,7 @@ function frameAllowed(res) {
   url is the link that should actually go into the player (may be the video pulled out of a page).
 */
 async function checkLink(raw, depth = 0) {
+  if (/^(rtmps?|rtsp|rtp|udp|srt|mms):\/\//i.test(String(raw).trim())) return { ok: false, status: "blocked", url: String(raw).trim(), note: "Browsers can't play this type of stream (RTMP, RTSP and similar)." };
   const u = safeUrl(raw);
   if (!u) return { ok: false, status: "missing", url: raw, note: "Not a valid web link." };
   const k = kindOf(u);
@@ -108,6 +112,18 @@ async function checkLink(raw, depth = 0) {
       const r = await get(u.href);
       const txt = r.ok ? (await r.text()).slice(0, 2000) : "";
       return txt.trimStart().startsWith("#EXTM3U") ? { ok: true, status: "plays", url: u.href, note: "Stream is online." } : { ok: false, status: "missing", url: u.href, note: r.ok ? "This isn't a working stream playlist." : `Stream didn't answer (error ${r.status}). It may be offline.` };
+    }
+    if (k.kind === "dash") {
+      const r = await get(u.href);
+      const txt = r.ok ? (await r.text()).slice(0, 4000) : "";
+      return /<MPD[\s>]/.test(txt) ? { ok: true, status: "plays", url: u.href, note: "DASH stream is online." } : { ok: false, status: "missing", url: u.href, note: r.ok ? "This isn't a working DASH stream." : `Stream didn't answer (error ${r.status}).` };
+    }
+    if (k.kind === "flv" || k.kind === "mpegts") {
+      const r = await get(u.href, { headers: { range: "bytes=0-187" } });
+      if (!r.ok) return { ok: false, status: "missing", url: u.href, note: `Stream didn't answer (error ${r.status}).` };
+      const head = Buffer.from(await r.arrayBuffer()).subarray(0, 4);
+      const looksRight = k.kind === "flv" ? head.toString("latin1", 0, 3) === "FLV" : head[0] === 0x47;
+      return looksRight ? { ok: true, status: "plays", url: u.href, note: (k.kind === "flv" ? "FLV" : "TS") + " stream is online." } : { ok: false, status: "missing", url: u.href, note: "The link answered but isn't a video stream." };
     }
     if (k.kind === "file") {
       const r = await get(u.href, { headers: { range: "bytes=0-1023" } });
