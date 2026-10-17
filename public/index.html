@@ -193,16 +193,11 @@ const SB = `sandbox="allow-scripts allow-same-origin allow-presentation"`;
 /* m = start muted (used for backups loading in the background) */
 function playerHTML(p, m) {
   switch (p.kind) {
-    case "youtube": return `<iframe src="https://www.youtube.com/embed/${p.id ? esc(p.id) + "?" : "videoseries?list=" + encodeURIComponent(p.list) + "&"}autoplay=1&mute=${m ? 1 : 0}&rel=0&playsinline=1${p.id && p.list ? "&list=" + encodeURIComponent(p.list) : ""}${p.start ? "&start=" + p.start : ""}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="YouTube player"></iframe>`;
-    case "twitch": return `<iframe src="https://player.twitch.tv/?${p.video ? "video=" + esc(p.video) : "channel=" + esc(p.channel)}&parent=${esc(host)}&autoplay=true&muted=${!!m}" allowfullscreen title="Twitch player"></iframe>`;
-    case "kick": return `<iframe src="https://player.kick.com/${esc(p.channel)}?autoplay=true&muted=${!!m}" allowfullscreen allow="autoplay; fullscreen" title="Kick player"></iframe>`;
-    case "vimeo": return `<iframe src="https://player.vimeo.com/video/${esc(p.id)}?${p.hash ? "h=" + esc(p.hash) + "&" : ""}autoplay=1&muted=${m ? 1 : 0}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Vimeo player"></iframe>`;
-    case "hls": case "dash": case "flv": case "mpegts": case "file": return `<video controls playsinline autoplay ${m ? "muted" : ""}></video><div class="engine" data-engine>Loading ${esc(p.label)}…</div><button type="button" class="btn sm unmute" data-unmute hidden>Tap for sound</button>`;
-    case "youtube": return `<iframe ${SB} src="https://www.youtube-nocookie.com/embed/${esc(p.id)}?autoplay=1&mute=${m ? 1 : 0}&rel=0&enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="YouTube player"></iframe>`;
+    case "youtube": return `<iframe ${SB} src="https://www.youtube.com/embed/${p.id ? esc(p.id) + "?" : "videoseries?list=" + encodeURIComponent(p.list) + "&"}autoplay=1&mute=${m ? 1 : 0}&rel=0&playsinline=1${p.id && p.list ? "&list=" + encodeURIComponent(p.list) : ""}${p.start ? "&start=" + p.start : ""}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="YouTube player"></iframe>`;
     case "twitch": return `<iframe ${SB} src="https://player.twitch.tv/?${p.video ? "video=" + esc(p.video) : "channel=" + esc(p.channel)}&parent=${esc(host)}&autoplay=true&muted=${!!m}" allowfullscreen title="Twitch player"></iframe>`;
     case "kick": return `<iframe ${SB} src="https://player.kick.com/${esc(p.channel)}?autoplay=true&muted=${!!m}" allowfullscreen allow="autoplay; fullscreen" title="Kick player"></iframe>`;
-    case "vimeo": return `<iframe ${SB} src="https://player.vimeo.com/video/${esc(p.id)}?autoplay=1&muted=${m ? 1 : 0}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Vimeo player"></iframe>`;
-    case "hls": case "dash": case "flv": case "mpegts": case "file": return `<video controls playsinline autoplay ${m ? "muted" : ""}></video><div class="engine" data-engine>Loading ${esc(p.label)}…</div>`;
+    case "vimeo": return `<iframe ${SB} src="https://player.vimeo.com/video/${esc(p.id)}?${p.hash ? "h=" + esc(p.hash) + "&" : ""}autoplay=1&muted=${m ? 1 : 0}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Vimeo player"></iframe>`;
+    case "hls": case "dash": case "flv": case "mpegts": case "file": return `<video controls playsinline autoplay ${m ? "muted" : ""}></video><div class="engine" data-engine>Loading ${esc(p.label)}…</div><button type="button" class="btn sm unmute" data-unmute hidden>Tap for sound</button>`;
     case "nobrowser": return `<div class="msg"><div style="display:grid;gap:8px;justify-items:center;max-width:420px"><b>${esc(p.label)}</b><span>Web browsers can't play this type of stream. Pick a backup, or ask for an HLS (.m3u8) link instead.</span></div></div>`;
     case "embed": return `<iframe ${SB} src="${esc(p.url)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="origin" title="Video player"></iframe><div class="hint">Blank screen? That site blocks other sites from showing its player. Try a backup.</div>`;
     default: return `<div class="msg">That link doesn't look right. Check it and try again.</div>`;
@@ -216,9 +211,9 @@ const ENGINES = {
 };
 const loaded = {};
 const loadScript = src => loaded[src] || (loaded[src] = new Promise((ok, no) => { const t = document.createElement("script"); t.src = src; t.onload = ok; t.onerror = () => { delete loaded[src]; no(); }; document.head.appendChild(t); }));
-/* Stream relay (Netlify function): fetches streams the browser can't load directly, e.g. plain http:// links
+/* Stream relay (Cloudflare function): fetches streams the browser can't load directly, e.g. plain http:// links
    on this secure site, servers that don't allow other sites (CORS), or hosts that only serve their own pages */
-const RELAY = "/.netlify/functions/stream";
+const RELAY = "/api/stream";
 const relayed = url => location.origin + RELAY + "?url=" + encodeURIComponent(url);
 const canRelay = /^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname) || location.port === "8889";
 /* Plays a direct stream with the best engine for it. If the direct link fails it retries once through the relay;
@@ -290,8 +285,8 @@ async function mountVideo(layer, p, onFail, viaRelay) {
     } else { say(viaRelay ? "Playing via relay" : ""); v.src = url; }
   } catch (e) { fail(); }
 }
-/* Video finder: pulls the embedded player or stream out of a normal web page (needs the Netlify function) */
-const FINDER = "/.netlify/functions/extract";
+/* Video finder: pulls the embedded player or stream out of a normal web page (needs the Cloudflare function) */
+const FINDER = "/api/extract";
 async function findVideos(url) {
   try {
     const res = await fetch(FINDER + "?url=" + encodeURIComponent(url));
@@ -301,7 +296,7 @@ async function findVideos(url) {
 }
 /* Link checker: confirms each link will play, swaps page links for the playable video inside,
    adds extra videos found on the page as backups, and moves links that won't play to the end */
-const CHECKER = "/.netlify/functions/check";
+const CHECKER = "/api/check";
 const checkCache = {};
 async function checkLink(url) {
   if (checkCache[url]) return checkCache[url];
@@ -322,7 +317,7 @@ async function verifyItems(items, say) {
     const all = [...new Set([...working, ...broken])];
     it.url = all[0]; it.backups = all.slice(1, 12);
   }
-  if (say) toast(offline ? "Links saved. The link checker runs once the site is on Netlify."
+  if (say) toast(offline ? "Links saved. The link checker runs once the site is on Cloudflare."
     : `Checked links: ${good} will play${bad ? `, ${bad} won't and moved to the end` : ""}${pulled ? `. Pulled ${pulled} video${pulled === 1 ? "" : "s"} out of pages` : ""}.`);
   return items;
 }
@@ -427,7 +422,7 @@ function remember(r) { const k = keyOf(r); const list = store.get().filter(x => 
 /* ===== Saved rooms: kept on this device and on the server, so they survive reloads, cleared data and other devices ===== */
 try { navigator.storage?.persist?.(); } catch (e) {}
 const newId = () => Math.random().toString(36).slice(2, 10).padEnd(8, "0");
-const API = "/.netlify/functions/rooms";
+const API = "/api/rooms";
 async function cloudSave(r) { try { const res = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ room: r }) }); return res.ok; } catch (e) { return false; } }
 async function cloudList() { try { const res = await fetch(API, { cache: "no-store" }); return res.ok ? await res.json() : null; } catch (e) { return null; } }
 async function cloudDelete(id) { try { await fetch(API + "?id=" + encodeURIComponent(id), { method: "DELETE" }); } catch (e) {} }
@@ -542,7 +537,7 @@ function room(path) {
       Promise.all(before.map(checkLink)).then(res => {
         t.disabled = false; t.textContent = "Check links";
         const rep = row.querySelector("[data-report]");
-        if (res.some(x => x === null)) { rep.textContent = "The checker runs once the site is on Netlify."; return; }
+        if (res.some(x => x === null)) { rep.textContent = "The checker runs once the site is on Cloudflare."; return; }
         verifyItems([it]).then(() => {
           row.querySelector('[data-f="url"]').value = it.url;
           row.querySelector('[data-f="backups"]').value = it.backups.join("\n");
