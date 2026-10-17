@@ -66,6 +66,7 @@ textarea{min-height:80px;resize:vertical}
 .player .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted)}
 .player .layer{position:absolute;inset:0}
 .player .engine{position:absolute;left:12px;top:12px;font-size:12px;font-weight:700;background:rgba(0,0,0,.6);padding:4px 10px;border-radius:999px;color:var(--ink);pointer-events:none}
+.player .unmute{position:absolute;right:12px;top:12px;z-index:2}
 .player .hint{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:12px;color:var(--muted);background:linear-gradient(transparent,rgba(0,0,0,.85));pointer-events:none;opacity:0;transition:opacity .3s}
 .player:hover .hint{opacity:1}
 .player .hint a{pointer-events:auto;color:var(--accent)}
@@ -141,10 +142,14 @@ function parse(url) {
   let u; try { u = new URL(url); } catch (e) { return { kind: "bad" }; }
   if (!/^https?:$/.test(u.protocol)) return { kind: "bad" };
   const h = u.hostname.replace(/^www\.|^m\./, "");
-  if (h === "youtu.be") return { kind: "youtube", id: u.pathname.slice(1), label: "YouTube" };
-  if (h.endsWith("youtube.com")) {
-    const id = u.searchParams.get("v") || (u.pathname.match(/\/(live|embed|shorts)\/([\w-]+)/) || [])[2];
-    if (id) return { kind: "youtube", id, label: "YouTube" };
+  if (h === "youtu.be" || h.endsWith("youtube.com") || h.endsWith("youtube-nocookie.com")) {
+    const id = h === "youtu.be" ? u.pathname.split("/")[1] : u.searchParams.get("v") || (u.pathname.match(/\/(live|embed|shorts|v)\/([\w-]+)/) || [])[2];
+    const list = u.searchParams.get("list");
+    const t = u.searchParams.get("t") || u.searchParams.get("start") || "";
+    const tm = t.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
+    const start = tm ? (+tm[1] || 0) * 3600 + (+tm[2] || 0) * 60 + (+tm[3] || 0) : 0;
+    if (id && id !== "videoseries") return { kind: "youtube", id, list, start, label: "YouTube" };
+    if (list) return { kind: "youtube", list, label: "YouTube playlist" };
   }
   if (h.endsWith("twitch.tv")) {
     const vid = u.pathname.match(/\/videos\/(\d+)/);
@@ -153,23 +158,37 @@ function parse(url) {
     if (ch) return { kind: "twitch", channel: ch, label: "Twitch" };
   }
   if (h.endsWith("kick.com")) { const ch = u.pathname.split("/").filter(Boolean)[0]; if (ch) return { kind: "kick", channel: ch, label: "Kick" }; }
-  if (h.endsWith("vimeo.com")) { const id = (u.pathname.match(/(\d+)/) || [])[1]; if (id) return { kind: "vimeo", id, label: "Vimeo" }; }
+  if (h.endsWith("vimeo.com")) { const mm = u.pathname.match(/(\d{5,})(?:\/([0-9a-f]{6,}))?/); if (mm) return { kind: "vimeo", id: mm[1], hash: u.searchParams.get("h") || mm[2] || "", label: "Vimeo" }; }
+  if (h === "drive.google.com" || h === "docs.google.com") {
+    const id = (u.pathname.match(/\/d\/([\w-]{10,})/) || [])[1] || u.searchParams.get("id");
+    if (id) return { kind: "embed", url: `https://drive.google.com/file/d/${id}/preview`, label: "Google Drive" };
+  }
+  if (h.endsWith("dropbox.com") && !h.startsWith("api")) {
+    const d = new URL(u.href); d.searchParams.delete("dl"); d.searchParams.set("raw", "1");
+    return { kind: "file", url: d.href, label: "Dropbox video" };
+  }
+  if (h.endsWith("dailymotion.com") || h === "dai.ly") {
+    const id = h === "dai.ly" ? u.pathname.slice(1) : (u.pathname.match(/\/video\/([a-z0-9]+)/i) || [])[1];
+    if (id) return { kind: "embed", url: `https://www.dailymotion.com/embed/video/${id}?autoplay=1`, label: "Dailymotion" };
+  }
+  if (h === "streamable.com") { const id = u.pathname.split("/").filter(x => x && x !== "e" && x !== "o")[0]; if (id) return { kind: "embed", url: `https://streamable.com/e/${id}?autoplay=1`, label: "Streamable" }; }
+  if ((h.endsWith("facebook.com") && /\/(videos|watch|reel)/.test(u.pathname + u.search)) || h === "fb.watch") return { kind: "embed", url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u.href)}&show_text=false&autoplay=true`, label: "Facebook video" };
   if (/\.m3u8($|\?)/i.test(u.pathname + u.search)) return { kind: "hls", url: u.href, label: "HLS stream" };
   if (/\.mpd($|\?)/i.test(u.pathname + u.search)) return { kind: "dash", url: u.href, label: "DASH stream" };
   if (/\.flv($|\?)/i.test(u.pathname)) return { kind: "flv", url: u.href, label: "FLV stream" };
   if (/\.ts($|\?)/i.test(u.pathname)) return { kind: "mpegts", url: u.href, label: "TS stream" };
-  if (/\.(mp4|webm|ogg|mov)($|\?)/i.test(u.pathname)) return { kind: "file", url: u.href, label: "Video" };
+  if (/\.(mp4|m4v|webm|ogg|ogv|mov|mkv)($|\?)/i.test(u.pathname)) return { kind: "file", url: u.href, label: "Video" };
   return { kind: "embed", url: u.href, label: h };
 }
 const host = location.hostname || "localhost";
 /* m = start muted (used for backups loading in the background) */
 function playerHTML(p, m) {
   switch (p.kind) {
-    case "youtube": return `<iframe src="https://www.youtube-nocookie.com/embed/${esc(p.id)}?autoplay=1&mute=${m ? 1 : 0}&rel=0&enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="YouTube player"></iframe>`;
+    case "youtube": return `<iframe src="https://www.youtube.com/embed/${p.id ? esc(p.id) + "?" : "videoseries?list=" + encodeURIComponent(p.list) + "&"}autoplay=1&mute=${m ? 1 : 0}&rel=0&playsinline=1${p.id && p.list ? "&list=" + encodeURIComponent(p.list) : ""}${p.start ? "&start=" + p.start : ""}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="YouTube player"></iframe>`;
     case "twitch": return `<iframe src="https://player.twitch.tv/?${p.video ? "video=" + esc(p.video) : "channel=" + esc(p.channel)}&parent=${esc(host)}&autoplay=true&muted=${!!m}" allowfullscreen title="Twitch player"></iframe>`;
     case "kick": return `<iframe src="https://player.kick.com/${esc(p.channel)}?autoplay=true&muted=${!!m}" allowfullscreen allow="autoplay; fullscreen" title="Kick player"></iframe>`;
-    case "vimeo": return `<iframe src="https://player.vimeo.com/video/${esc(p.id)}?autoplay=1&muted=${m ? 1 : 0}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Vimeo player"></iframe>`;
-    case "hls": case "dash": case "flv": case "mpegts": case "file": return `<video controls playsinline autoplay ${m ? "muted" : ""}></video><div class="engine" data-engine>Loading ${esc(p.label)}…</div>`;
+    case "vimeo": return `<iframe src="https://player.vimeo.com/video/${esc(p.id)}?${p.hash ? "h=" + esc(p.hash) + "&" : ""}autoplay=1&muted=${m ? 1 : 0}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Vimeo player"></iframe>`;
+    case "hls": case "dash": case "flv": case "mpegts": case "file": return `<video controls playsinline autoplay ${m ? "muted" : ""}></video><div class="engine" data-engine>Loading ${esc(p.label)}…</div><button type="button" class="btn sm unmute" data-unmute hidden>Tap for sound</button>`;
     case "nobrowser": return `<div class="msg"><div style="display:grid;gap:8px;justify-items:center;max-width:420px"><b>${esc(p.label)}</b><span>Web browsers can't play this type of stream. Pick a backup, or ask for an HLS (.m3u8) link instead.</span></div></div>`;
     case "embed": return `<iframe src="${esc(p.url)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="origin" title="Video player"></iframe><div class="hint">Blank screen? That site blocks other sites from showing its player. Try a backup or <a href="${esc(p.url)}" target="_blank" rel="noopener">open it in a new tab</a>.</div>`;
     default: return `<div class="msg">That link doesn't look right. Check it and try again.</div>`;
@@ -183,42 +202,78 @@ const ENGINES = {
 };
 const loaded = {};
 const loadScript = src => loaded[src] || (loaded[src] = new Promise((ok, no) => { const t = document.createElement("script"); t.src = src; t.onload = ok; t.onerror = () => { delete loaded[src]; no(); }; document.head.appendChild(t); }));
-/* Plays a direct stream with the best engine for it. onFail fires if it can't, so the room moves to the next backup. */
-async function mountVideo(layer, p, onFail) {
-  const v = layer.querySelector("video"); if (!v) return;
+/* Stream relay (Netlify function): fetches streams the browser can't load directly, e.g. plain http:// links
+   on this secure site, servers that don't allow other sites (CORS), or hosts that only serve their own pages */
+const RELAY = "/.netlify/functions/stream";
+const relayed = url => location.origin + RELAY + "?url=" + encodeURIComponent(url);
+const canRelay = /^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname) || location.port === "8889";
+/* Plays a direct stream with the best engine for it. If the direct link fails it retries once through the relay;
+   onFail fires if that fails too, so the room moves to the next backup. */
+async function mountVideo(layer, p, onFail, viaRelay) {
+  let v = layer.querySelector("video"); if (!v) return;
   const tag = layer.querySelector("[data-engine]");
   const say = t => { if (tag) { tag.textContent = t; tag.hidden = !t; } };
-  let failed = false; const fail = () => { if (failed) return; failed = true; say(""); onFail && onFail(); };
+  /* http:// media is blocked on an https page, so go straight to the relay */
+  if (!viaRelay && canRelay && location.protocol === "https:" && /^http:/i.test(p.url)) viaRelay = true;
+  const url = viaRelay ? relayed(p.url) : p.url;
+  let failed = false, stall;
+  const fail = () => {
+    if (failed) return; failed = true; clearTimeout(stall);
+    try { layer._destroy && layer._destroy(); } catch (e) {} layer._destroy = null;
+    if (!layer.isConnected) return; // the room already moved to another source
+    if (!viaRelay && canRelay && layer.isConnected) {
+      /* fresh <video> so no old listeners or engine state carry over */
+      const nv = v.cloneNode(false); v.replaceWith(nv);
+      say("Retrying through the Couchside relay…");
+      return mountVideo(layer, p, onFail, true);
+    }
+    say(""); onFail && onFail();
+  };
+  /* a stream that never gets going within 20 seconds counts as dropped */
+  stall = setTimeout(() => { if (layer.isConnected && v.readyState < 3) fail(); }, 20000);
+  v.addEventListener("canplay", () => clearTimeout(stall), { once: true });
   v.addEventListener("error", fail);
   v.addEventListener("playing", () => say(""), { once: true });
   v.addEventListener("loadeddata", () => say(""), { once: true });
+  /* browsers block autoplay with sound until someone interacts, so start muted and offer sound */
+  const unmute = layer.querySelector("[data-unmute]");
+  if (unmute) unmute.onclick = () => { v.muted = false; v.play().catch(() => {}); unmute.hidden = true; };
+  const kick = () => { const pr = v.play(); if (pr && pr.catch) pr.catch(err => { if (err && err.name === "NotAllowedError" && !v.muted) { v.muted = true; v.play().then(() => { if (unmute) unmute.hidden = false; }).catch(() => {}); } }); };
+  v.addEventListener("canplay", kick, { once: true });
+  const via = viaRelay ? " (via relay)" : "";
   try {
     if (p.kind === "hls") {
-      if (v.canPlayType("application/vnd.apple.mpegurl")) { say("Playing with the built-in player"); v.src = p.url; return; }
-      await loadScript(ENGINES.hls); if (!Hls.isSupported()) return fail();
-      say("Playing with hls.js");
-      const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-      let recovered = false;
-      hls.on(Hls.Events.ERROR, (e, d) => { if (!d.fatal) return; if (d.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) { recovered = true; hls.recoverMediaError(); } else fail(); });
-      hls.loadSource(p.url); hls.attachMedia(v);
-      layer._destroy = () => hls.destroy();
+      const mse = window.MediaSource || window.ManagedMediaSource;
+      if (mse) { await loadScript(ENGINES.hls).catch(() => {}); }
+      if (mse && window.Hls && Hls.isSupported()) {
+        if (failed) return;
+        say("Playing with hls.js" + via);
+        const hls = new Hls({ enableWorker: true, lowLatencyMode: true, manifestLoadingMaxRetry: 2, levelLoadingMaxRetry: 2, fragLoadingMaxRetry: 3 });
+        let recovered = false;
+        hls.on(Hls.Events.ERROR, (e, d) => { if (!d.fatal) return; if (d.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) { recovered = true; hls.recoverMediaError(); } else fail(); });
+        layer._destroy = () => hls.destroy();
+        hls.loadSource(url); hls.attachMedia(v);
+      } else if (v.canPlayType("application/vnd.apple.mpegurl")) { say("Playing with the built-in player" + via); v.src = url; }
+      else return fail();
     } else if (p.kind === "dash") {
       await loadScript(ENGINES.dash); shaka.polyfill.installAll();
       if (!shaka.Player.isBrowserSupported()) return fail();
-      say("Playing with Shaka Player");
+      if (failed) return;
+      say("Playing with Shaka Player" + via);
       const pl = new shaka.Player(); await pl.attach(v);
-      pl.addEventListener("error", fail);
+      pl.addEventListener("error", e => { if (e.detail && e.detail.severity === 2) fail(); });
       layer._destroy = () => pl.destroy();
-      await pl.load(p.url).catch(fail);
+      await pl.load(url).catch(fail);
     } else if (p.kind === "flv" || p.kind === "mpegts") {
       await loadScript(ENGINES.mpegts);
       if (!mpegts.isSupported()) return fail();
-      say("Playing with mpegts.js");
-      const pl = mpegts.createPlayer({ type: p.kind, isLive: true, url: p.url }, { enableStashBuffer: false });
+      if (failed) return;
+      say("Playing with mpegts.js" + via);
+      const pl = mpegts.createPlayer({ type: p.kind, isLive: p.kind === "flv" || !/\.ts($|\?)/i.test(p.url) || /live/i.test(p.url), url }, { enableStashBuffer: false });
       pl.on(mpegts.Events.ERROR, fail);
       pl.attachMediaElement(v); pl.load(); Promise.resolve(pl.play()).catch(() => {});
       layer._destroy = () => { try { pl.destroy(); } catch (e) {} };
-    } else { say(""); v.src = p.url; }
+    } else { say(viaRelay ? "Playing via relay" : ""); v.src = url; }
   } catch (e) { fail(); }
 }
 /* Video finder: pulls the embedded player or stream out of a normal web page (needs the Netlify function) */
@@ -369,9 +424,6 @@ function room(path) {
     const list = sourcesOf(r.items[idx]);
     /* check every source for this video in the background and colour its dot */
     list.forEach(u => checkLink(u).then(c => { document.querySelectorAll(`[data-dot="${CSS.escape(u)}"]`).forEach(d => { d.className = "dot " + (c ? (c.ok ? (c.status === "live-only" ? "maybe" : "ok") : "no") : ""); d.title = c ? c.note : "Checker not running here"; }); }));
-    /* direct streams that never start within 20 seconds count as dropped */
-    const vid = layer.querySelector("video");
-    if (vid) { const myKey = idx + ":" + src; const stall = setTimeout(() => { if (vid.readyState < 3 && myKey === idx + ":" + src && $("#player").contains(vid)) vid.dispatchEvent(new Event("error")); }, 20000); vid.addEventListener("canplay", () => clearTimeout(stall), { once: true }); }
     $("#srcbar").innerHTML = `<span class="note">Now playing</span>` + list.map((u, j) => { const q = parse(u); return `<button type="button" class="chip" data-s="${j}" aria-pressed="${j === src}"><span><i class="dot" data-dot="${esc(u)}"></i>${j === 0 ? "Main" : "Backup " + j}</span><small>${esc(q.label || "Link")}</small></button>`; }).join("") + `<button type="button" class="chip" data-reload>Reload<small>same source</small></button>`;
     $("#queue").innerHTML = r.items.map((it, j) => { const q = parse(it.url); const nb = (it.backups || []).length; return `<li><button data-i="${j}" aria-current="${j === idx}"><b>${esc(it.title)}</b><small>${esc(q.label || "Link")}${q.channel ? " · " + esc(q.channel) : ""}${nb ? " · " + nb + (nb === 1 ? " backup" : " backups") : ""}</small></button></li>`; }).join("");
     const chat = p.kind === "twitch" && p.channel ? `https://www.twitch.tv/embed/${encodeURIComponent(p.channel)}/chat?parent=${encodeURIComponent(host)}&darkpopout` : p.kind === "kick" ? `https://kick.com/popout/${encodeURIComponent(p.channel)}/chat` : "";
