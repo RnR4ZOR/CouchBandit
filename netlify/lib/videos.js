@@ -13,7 +13,7 @@ function safeUrl(raw) {
 async function get(url, opts = {}) {
   const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), opts.timeout || 7000);
   try {
-    return await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "user-agent": UA, accept: "*/*", ...(opts.headers || {}) } });
+    return await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "user-agent": UA, accept: "*/*", referer: new URL(url).origin + "/", ...(opts.headers || {}) } });
   } finally { clearTimeout(t); }
 }
 
@@ -23,7 +23,13 @@ function kindOf(u) {
   if (h.endsWith("youtube.com") || h.endsWith("youtube-nocookie.com")) {
     const id = u.searchParams.get("v") || (u.pathname.match(/\/(live|embed|shorts)\/([\w-]+)/) || [])[2];
     if (id) return { kind: "youtube", id };
+    if (u.searchParams.get("list")) return { kind: "hosted", name: "YouTube playlist" };
   }
+  if (h === "drive.google.com" || h === "docs.google.com") return { kind: "hosted", name: "Google Drive video" };
+  if (h.endsWith("dropbox.com")) return { kind: "hosted", name: "Dropbox video" };
+  if (h.endsWith("dailymotion.com") || h === "dai.ly") return { kind: "hosted", name: "Dailymotion video" };
+  if (h === "streamable.com") return { kind: "hosted", name: "Streamable video" };
+  if ((h.endsWith("facebook.com") && /\/(videos|watch|reel)/.test(u.pathname + u.search)) || h === "fb.watch") return { kind: "hosted", name: "Facebook video" };
   if (h.endsWith("twitch.tv")) return { kind: "twitch" };
   if (h.endsWith("kick.com")) return { kind: "kick" };
   if (h.endsWith("vimeo.com")) return { kind: "vimeo" };
@@ -31,7 +37,7 @@ function kindOf(u) {
   if (/\.mpd($|\?)/i.test(u.pathname + u.search)) return { kind: "dash" };
   if (/\.flv($|\?)/i.test(u.pathname)) return { kind: "flv" };
   if (/\.ts($|\?)/i.test(u.pathname)) return { kind: "mpegts" };
-  if (/\.(mp4|webm|ogg|mov)($|\?)/i.test(u.pathname)) return { kind: "file" };
+  if (/\.(mp4|m4v|webm|ogg|ogv|mov|mkv)($|\?)/i.test(u.pathname)) return { kind: "file" };
   return { kind: "page" };
 }
 
@@ -96,8 +102,14 @@ async function checkLink(raw, depth = 0) {
   try {
     if (k.kind === "youtube") {
       const r = await get(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent("https://www.youtube.com/watch?v=" + k.id)}`);
-      if (r.ok) return { ok: true, status: "plays", url: `https://www.youtube.com/watch?v=${k.id}`, note: "YouTube video allows embedding." };
+      if (r.ok) return { ok: true, status: "plays", url: u.href, note: "YouTube video allows embedding." };
       return { ok: false, status: r.status === 401 || r.status === 403 ? "blocked" : "missing", url: u.href, note: r.status === 401 || r.status === 403 ? "The owner has turned off embedding for this video." : "This video is private, removed or the link is wrong." };
+    }
+    // Sites with their own player: the room builds the right embed, so keep the link as it is
+    if (k.kind === "hosted") {
+      const r = await get(u.href, { headers: { accept: "text/html" } });
+      if (r.status === 404 || r.status === 410) return { ok: false, status: "missing", url: u.href, note: `That ${k.name.toLowerCase()} doesn't exist or was removed.` };
+      return { ok: true, status: "plays", url: u.href, note: `${k.name}. Plays if it's shared publicly.` };
     }
     if (k.kind === "vimeo") {
       const r = await get(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(u.href)}`);
@@ -128,7 +140,7 @@ async function checkLink(raw, depth = 0) {
     if (k.kind === "file") {
       const r = await get(u.href, { headers: { range: "bytes=0-1023" } });
       const type = r.headers.get("content-type") || "";
-      return r.ok && /video|octet-stream|mp4|webm/i.test(type) ? { ok: true, status: "plays", url: u.href, note: "Video file is reachable." } : { ok: false, status: "missing", url: u.href, note: `Video file didn't load (${r.ok ? type || "unknown type" : "error " + r.status}).` };
+      return r.ok && /video|octet-stream|mp4|webm|matroska|quicktime/i.test(type) ? { ok: true, status: "plays", url: u.href, note: "Video file is reachable." } : { ok: false, status: "missing", url: u.href, note: `Video file didn't load (${r.ok ? type || "unknown type" : "error " + r.status}).` };
     }
     // A normal page or an embed player page
     const r = await get(u.href, { timeout: 8000, headers: { accept: "text/html,*/*" } });
