@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Couchside</title>
+<meta name="description" content="Make a room, drop in a stream link, and send it to your mates.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Manrope:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#0c0b10; --surface:#16141d; --raise:#1f1c29; --ink:#f3f0fa; --muted:#a39db5; --line:#2b2738;
+  --accent:#ffcf3f; --accent-ink:#1a1400; --live:#ff4d6d; --good:#4fd18e;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif; --body:"Manrope",ui-sans-serif,system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body);min-height:100vh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+a{color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;gap:10px;padding-block:12px;flex-wrap:wrap}
+.logo{font:800 20px var(--display);text-decoration:none;margin-right:auto;display:flex;align-items:center;gap:8px}
+.logo b{width:28px;height:20px;border-radius:5px;background:var(--accent);position:relative}
+.logo b::after{content:"";position:absolute;left:11px;top:5px;border-left:8px solid var(--accent-ink);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.nav a.l{text-decoration:none;color:var(--muted);font-weight:700;font-size:14px;padding:8px 10px;border-radius:8px}
+.nav a.l:hover{color:var(--ink);background:var(--surface)}
+.btn{border:0;border-radius:10px;padding:11px 16px;font:700 15px var(--body);cursor:pointer;background:var(--accent);color:var(--accent-ink);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn.alt{background:var(--raise);color:var(--ink)}
+.btn.sm{padding:7px 12px;font-size:13px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.02em;text-wrap:balance}
+h1{font-size:clamp(32px,6vw,58px);font-weight:800;line-height:1.05}
+h2{font-size:22px;font-weight:800}
+.sub{color:var(--muted);margin:0;max-width:60ch}
+.note{font-size:13px;color:var(--muted)}
+main{padding-block:28px 64px;display:grid;gap:36px}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:start}
+@media(max-width:860px){.hero{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;gap:14px}
+label{display:grid;gap:5px;font-size:13px;font-weight:700;color:var(--muted)}
+input,select,textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;width:100%}
+textarea{min-height:80px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.two{grid-template-columns:1fr}}
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.room{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;text-decoration:none;display:grid;transition:transform .15s,border-color .15s}
+.room:hover{transform:translateY(-2px);border-color:var(--accent)}
+.thumb{aspect-ratio:16/9;max-width:100%;display:grid;place-items:center;font:800 28px var(--display);color:rgba(255,255,255,.9);position:relative}
+.thumb .src{position:absolute;left:10px;top:10px;font:700 11px var(--body);letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.55);padding:3px 8px;border-radius:5px}
+.thumb .when{position:absolute;right:10px;bottom:10px;font:700 12px var(--body);background:rgba(0,0,0,.6);padding:3px 8px;border-radius:5px}
+.room .meta{padding:12px 14px;display:grid;gap:2px}
+.room .meta span{font-size:13px;color:var(--muted)}
+.empty{border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--muted);text-align:center}
+.secthead{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+/* room view */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media(max-width:960px){.stage{grid-template-columns:1fr}}
+.player{aspect-ratio:16/9;width:100%;background:#000;border-radius:14px;overflow:hidden;position:relative}
+.player iframe,.player video{position:absolute;inset:0;width:100%;height:100%;border:0}
+.player .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted)}
+.player .layer{position:absolute;inset:0}
+.player .hint{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:12px;color:var(--muted);background:linear-gradient(transparent,rgba(0,0,0,.85));pointer-events:none;opacity:0;transition:opacity .3s}
+.player:hover .hint{opacity:1}
+.player .hint a{pointer-events:auto;color:var(--accent)}
+.srcbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.srcbar:empty{display:none}
+.chip{display:grid;gap:0;text-align:left;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:6px 12px;font:700 13px var(--body);cursor:pointer}
+.chip small{font-weight:500;color:var(--muted);font-size:11px}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--raise)}
+.editrow{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;background:var(--bg)}
+.editrowhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.roomhead{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)}
+.live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--live)}
+.side{display:grid;gap:14px}
+.queue{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.queue button{width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;cursor:pointer;display:grid;gap:2px}
+.queue button[aria-current="true"]{border-color:var(--accent)}
+.queue small{color:var(--muted)}
+.chatframe{width:100%;height:420px;border:0;border-radius:12px;background:var(--bg)}
+.sharebox{display:flex;gap:8px}
+.sharebox input{flex:1;min-width:0;font-size:13px}
+.count{font:800 28px var(--display);color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:700;z-index:20}
+footer{border-top:1px solid var(--line);padding-block:22px;color:var(--muted);font-size:13px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="wrap nav">
+  <a class="logo" href="#/"><b></b>Couchside</a>
+  <a class="l" href="#/">Rooms</a>
+  <a class="l" href="#/new">New room</a>
+</div></header>
+
+<main class="wrap" id="app"></main>
+
+<footer><div class="wrap">Couchside · Watch together. Only share streams you have the right to share.</div></footer>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js"></script>
+<script>
+/* ===== Featured rooms: edit this list to pin rooms for everyone who visits ===== */
+const FEATURED = [
+  { name: "Lofi study room", host: "Couchside", topic: "Chill beats while you work", items: [{ title: "Lofi radio", url: "https://www.youtube.com/watch?v=jfKfPfyJRdk" }] },
+  { name: "Space station cams", host: "Couchside", topic: "Earth from orbit", items: [{ title: "ISS live view", url: "https://www.youtube.com/watch?v=xRPjKQtRXR8" }] }
+];
+/* ============================================================================ */
+
+const $ = s => document.querySelector(s);
+const app = $("#app");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const dec = s => { try { s = s.replace(/-/g, "+").replace(/_/g, "/"); return JSON.parse(decodeURIComponent(escape(atob(s)))); } catch (e) { return null; } };
+const store = { get() { try { return JSON.parse(localStorage.getItem("couchside-rooms")) || []; } catch (e) { return []; } },
+  set(v) { try { localStorage.setItem("couchside-rooms", JSON.stringify(v)); } catch (e) {} } };
+const roomLink = r => `${location.origin}${location.pathname}#/room/${enc(r)}`;
+let tt; const toast = m => { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2200); };
+
+/* Work out what kind of stream a link is */
+function cleanLink(raw) {
+  raw = String(raw || "").trim();
+  const m = raw.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i); // pasted embed code
+  if (m) raw = m[1].replace(/&amp;/g, "&");
+  if (raw.startsWith("//")) raw = "https:" + raw;
+  return raw;
+}
+function parse(url) {
+  url = cleanLink(url);
+  let u; try { u = new URL(url); } catch (e) { return { kind: "bad" }; }
+  if (!/^https?:$/.test(u.protocol)) return { kind: "bad" };
+  const h = u.hostname.replace(/^www\.|^m\./, "");
+  if (h === "youtu.be") return { kind: "youtube", id: u.pathname.slice(1), label: "YouTube" };
+  if (h.endsWith("youtube.com")) {
+    const id = u.searchParams.get("v") || (u.pathname.match(/\/(live|embed|shorts)\/([\w-]+)/) || [])[2];
+    if (id) return { kind: "youtube", id, label: "YouTube" };
+  }
+  if (h.endsWith("twitch.tv")) {
+    const vid = u.pathname.match(/\/videos\/(\d+)/);
+    if (vid) return { kind: "twitch", video: vid[1], label: "Twitch" };
+    const ch = u.pathname.split("/").filter(Boolean)[0];
+    if (ch) return { kind: "twitch", channel: ch, label: "Twitch" };
+  }
+  if (h.endsWith("kick.com")) { const ch = u.pathname.split("/").filter(Boolean)[0]; if (ch) return { kind: "kick", channel: ch, label: "Kick" }; }
+  if (h.endsWith("vimeo.com")) { const id = (u.pathname.match(/(\d+)/) || [])[1]; if (id) return { kind: "vimeo", id, label: "Vimeo" }; }
+  if (/\.m3u8($|\?)/i.test(u.pathname + u.search)) return { kind: "hls", url: u.href, label: "Live stream" };
+  if (/\.(mp4|webm|ogg|mov)($|\?)/i.test(u.pathname)) return { kind: "file", url: u.href, label: "Video" };
+  return { kind: "embed", url: u.href, label: h };
+}
+const host = location.hostname || "localhost";
+/* m = start muted (used for backups loading in the background) */
+function playerHTML(p, m) {
+  switch (p.kind) {
+    case "youtube": return `<iframe src="https://www.youtube-nocookie.com/embed/${esc(p.id)}?autoplay=1&mute=${m ? 1 : 0}&rel=0&enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="YouTube player"></iframe>`;
+    case "twitch": return `<iframe src="https://player.twitch.tv/?${p.video ? "video=" + esc(p.video) : "channel=" + esc(p.channel)}&parent=${esc(host)}&autoplay=true&muted=${!!m}" allowfullscreen title="Twitch player"></iframe>`;
+    case "kick": return `<iframe src="https://player.kick.com/${esc(p.channel)}?autoplay=true&muted=${!!m}" allowfullscreen allow="autoplay; fullscreen" title="Kick player"></iframe>`;
+    case "vimeo": return `<iframe src="https://player.vimeo.com/video/${esc(p.id)}?autoplay=1&muted=${m ? 1 : 0}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Vimeo player"></iframe>`;
+    case "hls": case "file": return `<video controls playsinline autoplay ${m ? "muted" : ""}></video>`;
+    case "embed": return `<iframe src="${esc(p.url)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="origin" title="Video player"></iframe><div class="hint">Blank screen? That site blocks other sites from showing its player. Try a backup or <a href="${esc(p.url)}" target="_blank" rel="noopener">open it in a new tab</a>.</div>`;
+    default: return `<div class="msg">That link doesn't look right. Check it and try again.</div>`;
+  }
+}
+/* onFail fires when a direct stream (.m3u8/.mp4) dies, so the room can jump to the next backup */
+function mountVideo(layer, p, onFail) {
+  const v = layer.querySelector("video"); if (!v) return;
+  const fail = () => onFail && onFail();
+  v.addEventListener("error", fail);
+  if (p.kind === "hls" && !v.canPlayType("application/vnd.apple.mpegurl") && window.Hls && Hls.isSupported()) {
+    const hls = new Hls(); hls.loadSource(p.url); hls.attachMedia(v);
+    hls.on(Hls.Events.ERROR, (e, d) => { if (d.fatal) fail(); });
+    layer._hls = hls;
+  } else v.src = p.url;
+}
+/* Video finder: pulls the embedded player or stream out of a normal web page (needs the Netlify function) */
+const FINDER = "/.netlify/functions/extract";
+async function findVideos(url) {
+  try {
+    const res = await fetch(FINDER + "?url=" + encodeURIComponent(url));
+    const j = await res.json();
+    return res.ok ? (j.found || []) : { error: j.error };
+  } catch (e) { return { error: "The video finder isn't running on this host yet." }; }
+}
+/* If a main link is just a web page, swap in the video found inside it and keep the other finds as backups */
+async function resolveItems(items, say) {
+  let pulled = 0, failed = "";
+  for (const it of items) {
+    if (parse(it.url).kind !== "embed") continue;
+    const f = await findVideos(it.url);
+    if (Array.isArray(f) && f.length) {
+      const urls = f.map(x => x.url).filter(u => parse(u).kind !== "bad");
+      const page = it.url;
+      it.url = urls[0];
+      it.backups = [...new Set([...urls.slice(1), ...(it.backups || []), page])].filter(u => u !== it.url).slice(0, 10);
+      pulled++;
+    } else failed = Array.isArray(f) ? "No video found in that page, so it'll play as a normal embed." : f.error;
+  }
+  if (say) toast(pulled ? `Pulled ${pulled === 1 ? "the video" : pulled + " videos"} out of the page` : failed || "");
+  return items;
+}
+const sourcesOf = it => [it.url, ...(it.backups || [])].filter(Boolean);
+const COLORS = [["#5b3df5", "#ff4d6d"], ["#0f9d8a", "#2a6df4"], ["#f25c05", "#c41d7f"], ["#3a7d44", "#e0a100"], ["#1d4ed8", "#06b6d4"]];
+const thumbBg = name => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const [a, b] = COLORS[h % COLORS.length]; return `linear-gradient(135deg,${a},${b})`; };
+const initials = n => n.split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
+function startLabel(start) {
+  if (!start) return "";
+  const t = new Date(start), now = new Date();
+  if (t <= now) return "Started";
+  return t.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+}
+function roomCard(r) {
+  const p = parse(r.items[0].url);
+  return `<a class="room" href="#/room/${enc(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${esc(p.label || "Stream")}</span>${initials(r.name)}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
+    <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " video" : " videos")))} · by ${esc(r.host || "you")}</span></div></a>`;
+}
+
+/* ===== Pages ===== */
+function home() {
+  const mine = store.get();
+  app.innerHTML = `
+  <section class="hero">
+    <div style="display:grid;gap:16px;align-content:start">
+      <h1>Make a room. Drop a stream. Send the link.</h1>
+      <p class="sub">Paste a YouTube, Twitch, Kick or Vimeo link, or a direct .m3u8 or .mp4 stream. Couchside turns it into a room your mates can open on any phone or laptop, no sign-up needed.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="#/new">Create a room</a><a class="btn alt" href="#rooms">Browse rooms</a></div>
+    </div>
+    ${quickForm()}
+  </section>
+  <section id="rooms">
+    <div class="secthead"><h2>Your rooms</h2>${mine.length ? `<button class="btn alt sm" id="clearMine">Clear list</button>` : ""}</div>
+    ${mine.length ? `<div class="rooms">${mine.map(roomCard).join("")}</div>` : `<div class="empty">Rooms you create or open show up here, on this device.</div>`}
+  </section>
+  <section>
+    <div class="secthead"><h2>Featured rooms</h2><span class="note">Open to everyone who visits</span></div>
+    <div class="rooms">${FEATURED.map(roomCard).join("")}</div>
+  </section>`;
+  bindQuick();
+  const c = $("#clearMine"); if (c) c.onclick = () => { store.set([]); home(); toast("List cleared"); };
+}
+function quickForm(full) {
+  return `<form class="card" id="qf">
+    <h2>${full ? "Set up your room" : "Quick room"}</h2>
+    <label>Room name<input id="q_name" required maxlength="60" placeholder="Friday fight night"></label>
+    <label>Stream link or embed code<input id="q_url" required placeholder="https://www.twitch.tv/yourchannel"></label>
+    ${full ? `
+    <div class="two"><label>Your name<input id="q_host" maxlength="40" placeholder="Mark"></label>
+    <label>Starts at (optional)<input id="q_start" type="datetime-local"></label></div>
+    <label>What's on<input id="q_topic" maxlength="80" placeholder="Main card, pre-show chat from 7"></label>
+    <label>Backup links for the main stream (optional, one per line)<textarea id="q_backups" placeholder="If the main link drops, the room switches to these"></textarea></label>
+    <label>Up next (optional, one link per line)<textarea id="q_more" placeholder="https://youtu.be/...&#10;https://youtu.be/..."></textarea></label>` : ""}
+    <p class="note" id="q_detect">Paste a link or embed code and I'll check it.</p>
+    <button class="btn" type="submit">Create room</button>
+  </form>`;
+}
+function bindQuick() {
+  const f = $("#qf"); if (!f) return;
+  $("#q_url").addEventListener("input", e => {
+    const p = parse(e.target.value);
+    $("#q_detect").textContent = !e.target.value ? "Paste a link or embed code and I'll check it." : p.kind === "bad" ? "That isn't a full link yet. It should start with https://" : p.kind === "embed" ? `Web page from ${p.label}. I'll pull the video out of it when you create the room.` : `Looks good: ${p.label}${p.channel ? " channel " + p.channel : ""}.`;
+  });
+  f.addEventListener("submit", async e => {
+    e.preventDefault();
+    const sb = f.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Finding videos…";
+    const bk = $("#q_backups");
+    const items = [{ title: "Main stream", url: cleanLink($("#q_url").value), backups: bk ? bk.value.split(/\n+/).map(cleanLink).filter(Boolean) : [] }];
+    const more = $("#q_more"); if (more) more.value.split(/\n+/).map(s => s.trim()).filter(Boolean).forEach((u, i) => items.push({ title: "Up next " + (i + 1), url: cleanLink(u), backups: [] }));
+    const r = { name: $("#q_name").value.trim(), host: ($("#q_host") || {}).value?.trim() || "", topic: ($("#q_topic") || {}).value?.trim() || "", start: ($("#q_start") || {}).value || "", items };
+    await resolveItems(r.items, true);
+    sb.disabled = false;
+    remember(r); location.hash = "#/room/" + enc(r);
+  });
+}
+function remember(r) { const k = enc(r); const list = store.get().filter(x => enc(x) !== k); list.unshift(r); store.set(list.slice(0, 24)); }
+function newRoom() { app.innerHTML = `<section style="max-width:640px;width:100%;margin:0 auto;display:grid;gap:16px"><a href="#/" class="note">← All rooms</a>${quickForm(true)}<p class="note">Everything about the room lives in its link, so anyone you send it to sees the same stream and line-up.</p></section>`; bindQuick(); }
+let timer;
+function room(path) {
+  const [code, si, ss] = path.split("/");
+  const r = dec(code);
+  if (!r || !Array.isArray(r.items) || !r.items.length) { app.innerHTML = `<div class="empty">This room link is broken or incomplete. Ask whoever sent it to copy it again.<br><br><a class="btn" href="#/">Back to rooms</a></div>`; return; }
+  remember(r);
+  let idx = 0, src = 0; const link = roomLink(r);
+  app.innerHTML = `
+  <a href="#/" class="note">← All rooms</a>
+  <div class="roomhead"><div style="display:grid;gap:4px"><span class="live" id="liveTag">Room open</span><h1 style="font-size:clamp(26px,4vw,40px)">${esc(r.name)}</h1><span class="note">${esc(r.topic || "")}${r.host ? (r.topic ? " · " : "") + "Hosted by " + esc(r.host) : ""}</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
+  <div class="stage">
+    <div style="display:grid;gap:12px;min-width:0">
+      <div class="player" id="player"></div>
+      <div class="srcbar" id="srcbar"></div>
+      <div id="countdown" class="card" hidden></div>
+      <form class="card" id="editor" hidden></form>
+    </div>
+    <aside class="side">
+      <div class="card"><h3>Invite your mates</h3><div class="sharebox"><input id="shareLink" readonly value="${esc(link)}" aria-label="Room link"><button class="btn sm" id="copyBtn">Copy</button></div><span class="note">Anyone with this link can join. No account needed.</span></div>
+      <div class="card"><h3>Line-up</h3><ul class="queue" id="queue"></ul></div>
+      <div class="card" id="chatCard" hidden><h3>Chat</h3><iframe class="chatframe" id="chat" title="Stream chat"></iframe></div>
+    </aside>
+  </div>`;
+
+  /* Universal player: one frame. Picking a source reloads the player with only that source. */
+  function show(i, s, quiet) {
+    const srcs = sourcesOf(r.items[i]);
+    idx = Math.min(Math.max(0, i), r.items.length - 1); src = Math.min(Math.max(0, s), sourcesOf(r.items[idx]).length - 1);
+    const p = parse(sourcesOf(r.items[idx])[src]);
+    const old = $("#player").querySelector(".layer"); old?._hls?.destroy();
+    $("#player").innerHTML = `<div class="layer on">${playerHTML(p)}</div>`;
+    const layer = $("#player").firstChild;
+    mountVideo(layer, p, () => { const n = sourcesOf(r.items[idx]).length; if (src + 1 < n) { toast("Stream dropped. Loading backup " + (src + 1)); show(idx, src + 1); } else toast("Stream dropped and there are no more backups."); });
+    history.replaceState(null, "", `#/room/${code}/${idx}/${src}`);
+    const list = sourcesOf(r.items[idx]);
+    $("#srcbar").innerHTML = `<span class="note">Now playing</span>` + list.map((u, j) => { const q = parse(u); return `<button type="button" class="chip" data-s="${j}" aria-pressed="${j === src}">${j === 0 ? "Main" : "Backup " + j}<small>${esc(q.label || "Link")}</small></button>`; }).join("") + `<button type="button" class="chip" data-reload>Reload<small>same source</small></button><button type="button" class="chip" data-vlc>Open in VLC<small>copies the link</small></button>`;
+    $("#queue").innerHTML = r.items.map((it, j) => { const q = parse(it.url); const nb = (it.backups || []).length; return `<li><button data-i="${j}" aria-current="${j === idx}"><b>${esc(it.title)}</b><small>${esc(q.label || "Link")}${q.channel ? " · " + esc(q.channel) : ""}${nb ? " · " + nb + (nb === 1 ? " backup" : " backups") : ""}</small></button></li>`; }).join("");
+    const chat = p.kind === "twitch" && p.channel ? `https://www.twitch.tv/embed/${encodeURIComponent(p.channel)}/chat?parent=${encodeURIComponent(host)}&darkpopout` : p.kind === "kick" ? `https://kick.com/popout/${encodeURIComponent(p.channel)}/chat` : "";
+    $("#chatCard").hidden = !chat; if (chat && $("#chat").src !== chat) $("#chat").src = chat;
+    if (!quiet && list.length > 1) toast(src === 0 ? "Main stream loaded" : "Backup " + src + " loaded");
+  }
+  $("#queue").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(+b.dataset.i, 0, true); });
+  $("#srcbar").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; if (b.hasAttribute("data-vlc")) { const u = sourcesOf(r.items[idx])[src]; const done = () => toast("Link copied. In VLC choose Open Network Stream and paste it"); navigator.clipboard ? navigator.clipboard.writeText(u).then(done, () => toast(u)) : toast(u); if (/iPhone|iPad/.test(navigator.userAgent)) location.href = "vlc-x-callback://x-callback-url/stream?url=" + encodeURIComponent(u); return; } if (b.hasAttribute("data-reload")) show(idx, src); else show(idx, +b.dataset.s); });
+  $("#copyBtn").onclick = () => { const sel = () => { $("#shareLink").select(); toast("Link selected, copy it"); }; navigator.clipboard ? navigator.clipboard.writeText(link).then(() => toast("Link copied"), sel) : sel(); };
+  $("#shareBtn").onclick = async () => { if (navigator.share) { try { await navigator.share({ title: r.name, text: `Join my room on Couchside: ${r.name}`, url: link }); } catch (e) {} } else $("#copyBtn").click(); };
+  $("#fsBtn").onclick = () => { const el = $("#player"); (el.requestFullscreen || el.webkitRequestFullscreen || (() => toast("Full screen isn't available here"))).call(el); };
+
+  /* ===== Edit room: rename, change links, add or remove backups and videos ===== */
+  const ed = $("#editor");
+  const rowHTML = (it, j) => `<div class="editrow" data-row>
+      <div class="editrowhead"><b>Video ${j + 1}</b><span style="display:flex;gap:6px"><button type="button" class="btn alt sm" data-up>↑</button><button type="button" class="btn alt sm" data-down>↓</button><button type="button" class="btn alt sm" data-del>Remove</button></span></div>
+      <div class="two"><label>Title<input data-f="title" maxlength="60" value="${esc(it.title || "")}"></label><label>Main link<input data-f="url" required value="${esc(it.url || "")}" placeholder="https://"></label></div>
+      <button type="button" class="btn alt sm" data-find style="justify-self:start">Pull video from main link</button>
+      <label>Backup links (one per line)<textarea data-f="backups" placeholder="https://...">${esc((it.backups || []).join("\n"))}</textarea></label>
+    </div>`;
+  const renderEditor = items => {
+    ed.innerHTML = `<div class="secthead" style="margin:0"><h2>Edit room</h2><button type="button" class="btn alt sm" id="edClose">Close</button></div>
+      <div class="two"><label>Room name<input id="ed_name" required maxlength="60" value="${esc(r.name)}"></label><label>Your name<input id="ed_host" maxlength="40" value="${esc(r.host || "")}"></label></div>
+      <div class="two"><label>What's on<input id="ed_topic" maxlength="80" value="${esc(r.topic || "")}"></label><label>Starts at<input id="ed_start" type="datetime-local" value="${esc(r.start || "")}"></label></div>
+      <div id="edRows" style="display:grid;gap:12px">${items.map(rowHTML).join("")}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt" id="edAdd">Add video</button><button class="btn" type="submit">Save changes</button></div>
+      <p class="note">Saving gives the room a new link. Send the new link to your mates so they see the changes.</p>`;
+  };
+  const readRows = () => [...ed.querySelectorAll("[data-row]")].map((row, j) => ({ title: row.querySelector('[data-f="title"]').value.trim() || "Video " + (j + 1), url: cleanLink(row.querySelector('[data-f="url"]').value), backups: row.querySelector('[data-f="backups"]').value.split(/\n+/).map(cleanLink).filter(Boolean) }));
+  $("#editBtn").onclick = () => { if (ed.hidden) { renderEditor(r.items); ed.hidden = false; ed.scrollIntoView({ behavior: "smooth", block: "start" }); } else ed.hidden = true; };
+  ed.addEventListener("click", e => {
+    const t = e.target;
+    if (t.id === "edClose") { ed.hidden = true; return; }
+    const items = readRows(); const row = t.closest("[data-row]"); const j = row ? [...ed.querySelectorAll("[data-row]")].indexOf(row) : -1;
+    if (t.id === "edAdd") items.push({ title: "", url: "", backups: [] });
+    else if (t.hasAttribute("data-del")) { if (items.length === 1) { toast("A room needs at least one video"); return; } items.splice(j, 1); }
+    else if (t.hasAttribute("data-find")) {
+      const it = items[j]; if (!it.url) { toast("Add a main link first"); return; }
+      t.disabled = true; t.textContent = "Looking…";
+      findVideos(it.url).then(f => {
+        t.disabled = false; t.textContent = "Pull video from main link";
+        if (!Array.isArray(f) || !f.length) { toast(Array.isArray(f) ? "No video found in that page" : f.error); return; }
+        const urls = f.map(x => x.url);
+        row.querySelector('[data-f="url"]').value = urls[0];
+        const bk = row.querySelector('[data-f="backups"]');
+        bk.value = [...new Set([...urls.slice(1), ...bk.value.split(/\n+/).map(s => s.trim()).filter(Boolean), it.url])].filter(u => u !== urls[0]).join("\n");
+        toast(`Found ${urls.length} ${urls.length === 1 ? "video" : "videos"}. Extras added as backups`);
+      });
+      return;
+    }
+    else if (t.hasAttribute("data-up") && j > 0) [items[j - 1], items[j]] = [items[j], items[j - 1]];
+    else if (t.hasAttribute("data-down") && j < items.length - 1) [items[j + 1], items[j]] = [items[j], items[j + 1]];
+    else return;
+    const keep = { name: $("#ed_name").value, host: $("#ed_host").value, topic: $("#ed_topic").value, start: $("#ed_start").value };
+    renderEditor(items); $("#ed_name").value = keep.name; $("#ed_host").value = keep.host; $("#ed_topic").value = keep.topic; $("#ed_start").value = keep.start;
+  });
+  ed.addEventListener("submit", async e => {
+    e.preventDefault();
+    const items = readRows().filter(it => it.url);
+    const sb = ed.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Finding videos…";
+    await resolveItems(items, true);
+    sb.disabled = false; sb.textContent = "Save changes";
+    if (!items.length) { toast("Add at least one link"); return; }
+    const bad = items.flatMap(it => sourcesOf(it)).find(u => parse(u).kind === "bad");
+    if (bad) { toast("Fix this link first: " + bad.slice(0, 40)); return; }
+    const nr = { name: $("#ed_name").value.trim() || r.name, host: $("#ed_host").value.trim(), topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
+    store.set(store.get().filter(x => enc(x) !== code)); remember(nr);
+    location.hash = "#/room/" + enc(nr); setTimeout(() => toast("Saved. Share the new link"), 50);
+  });
+
+  show(+si || 0, +ss || 0, true);
+  clearInterval(timer);
+  if (r.start && new Date(r.start) > new Date()) {
+    const cd = $("#countdown"); cd.hidden = false; $("#liveTag").textContent = "Starting soon";
+    const tick = () => { const ms = new Date(r.start) - new Date(); if (ms <= 0) { cd.innerHTML = `<span class="count">We're on.</span><span class="note">Hit play and enjoy.</span>`; $("#liveTag").textContent = "Live now"; clearInterval(timer); return; }
+      const h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4), s = Math.floor(ms % 6e4 / 1e3);
+      cd.innerHTML = `<span class="note">Party starts in</span><span class="count">${h ? h + "h " : ""}${m}m ${String(s).padStart(2, "0")}s</span><span class="note">${new Date(r.start).toLocaleString(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" })} your time</span>`; };
+    tick(); timer = setInterval(tick, 1000);
+  }
+}
+
+function route() {
+  clearInterval(timer);
+  const h = location.hash || "#/";
+  if (h.startsWith("#/room/")) room(h.slice(7));
+  else if (h === "#/new") newRoom();
+  else if (h === "#rooms") { home(); document.getElementById("rooms")?.scrollIntoView(); return; }
+  else home();
+  window.scrollTo(0, 0);
+}
+addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>
