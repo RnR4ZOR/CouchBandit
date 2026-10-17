@@ -308,6 +308,10 @@ function home() {
   </section>`;
   bindQuick();
   const c = $("#clearMine"); if (c) c.onclick = () => { if (!confirm("Remove all rooms from this list? Saved rooms are deleted for good.")) return; store.get().forEach(x => x.id && cloudDelete(x.id)); store.set([]); home(); toast("List cleared"); };
+  /* publish older rooms on this device that were never saved to the server */
+  const local = store.get(); let changed = false;
+  local.forEach(r => { if (!r.id) { r.id = newId(); r.created = r.created || Date.now(); changed = true; cloudSave(r); } });
+  if (changed) store.set(local);
   cloudList().then(list => {
     const box = $("#openRooms"); if (!box) return;
     const rooms = (list || []).filter(r => !expired(r)), mineIds = new Set(store.get().map(x => x.id).filter(Boolean));
