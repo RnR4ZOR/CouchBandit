@@ -71,6 +71,8 @@ textarea{min-height:80px;resize:vertical}
 .srcbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .srcbar:empty{display:none}
 .chip{display:grid;gap:0;text-align:left;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:6px 12px;font:700 13px var(--body);cursor:pointer}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle;opacity:.6}
+.dot.ok{background:var(--good);opacity:1}.dot.maybe{background:var(--accent);opacity:1}.dot.no{background:var(--coral);opacity:1}
 .chip small{font-weight:500;color:var(--muted);font-size:11px}
 .chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
 .chip[aria-pressed="true"] small{color:var(--accent-ink);opacity:.75}
@@ -188,21 +190,31 @@ async function findVideos(url) {
     return res.ok ? (j.found || []) : { error: j.error };
   } catch (e) { return { error: "The video finder isn't running on this host yet." }; }
 }
-/* If a main link is just a web page, swap in the video found inside it and keep the other finds as backups */
-async function resolveItems(items, say) {
-  let pulled = 0, failed = "";
+/* Link checker: confirms each link will play, swaps page links for the playable video inside,
+   adds extra videos found on the page as backups, and moves links that won't play to the end */
+const CHECKER = "/.netlify/functions/check";
+const checkCache = {};
+async function checkLink(url) {
+  if (checkCache[url]) return checkCache[url];
+  try { const r = await fetch(CHECKER + "?url=" + encodeURIComponent(url)); if (!r.ok) throw 0; return checkCache[url] = await r.json(); }
+  catch (e) { return null; } // checker not running on this host
+}
+async function verifyItems(items, say) {
+  let good = 0, bad = 0, pulled = 0, offline = false;
   for (const it of items) {
-    if (parse(it.url).kind !== "embed") continue;
-    const f = await findVideos(it.url);
-    if (Array.isArray(f) && f.length) {
-      const urls = f.map(x => x.url).filter(u => parse(u).kind !== "bad");
-      const page = it.url;
-      it.url = urls[0];
-      it.backups = [...new Set([...urls.slice(1), ...(it.backups || []), page])].filter(u => u !== it.url).slice(0, 10);
-      pulled++;
-    } else failed = Array.isArray(f) ? "No video found in that page, so it'll play as a normal embed." : f.error;
+    const srcs = [...new Set(sourcesOf(it))];
+    const res = await Promise.all(srcs.map(checkLink));
+    if (res.some(x => x === null)) { offline = true; continue; }
+    const working = [], broken = [];
+    res.forEach((r, j) => {
+      if (r.ok) { working.push(r.url); (r.alternatives || []).forEach(a => working.push(a)); if (r.url !== srcs[j]) pulled++; good++; }
+      else { broken.push(srcs[j]); bad++; }
+    });
+    const all = [...new Set([...working, ...broken])];
+    it.url = all[0]; it.backups = all.slice(1, 12);
   }
-  if (say) toast(pulled ? `Pulled ${pulled === 1 ? "the video" : pulled + " videos"} out of the page` : failed || "");
+  if (say) toast(offline ? "Links saved. The link checker runs once the site is on Netlify."
+    : `Checked links: ${good} will play${bad ? `, ${bad} won't and moved to the end` : ""}${pulled ? `. Pulled ${pulled} video${pulled === 1 ? "" : "s"} out of pages` : ""}.`);
   return items;
 }
 const sourcesOf = it => [it.url, ...(it.backups || [])].filter(Boolean);
@@ -267,12 +279,12 @@ function bindQuick() {
   });
   f.addEventListener("submit", async e => {
     e.preventDefault();
-    const sb = f.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Finding videos…";
+    const sb = f.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Checking links…";
     const bk = $("#q_backups");
     const items = [{ title: "Main stream", url: cleanLink($("#q_url").value), backups: bk ? bk.value.split(/\n+/).map(cleanLink).filter(Boolean) : [] }];
     const more = $("#q_more"); if (more) more.value.split(/\n+/).map(s => s.trim()).filter(Boolean).forEach((u, i) => items.push({ title: "Up next " + (i + 1), url: cleanLink(u), backups: [] }));
     const r = { name: $("#q_name").value.trim(), host: ($("#q_host") || {}).value?.trim() || "", topic: ($("#q_topic") || {}).value?.trim() || "", start: ($("#q_start") || {}).value || "", items };
-    await resolveItems(r.items, true);
+    await verifyItems(r.items, true);
     sb.disabled = false;
     remember(r); location.hash = "#/room/" + enc(r);
   });
@@ -315,7 +327,12 @@ function room(path) {
     mountVideo(layer, p, () => { const n = sourcesOf(r.items[idx]).length; if (src + 1 < n) { toast("Stream dropped. Loading backup " + (src + 1)); show(idx, src + 1); } else toast("Stream dropped and there are no more backups."); });
     history.replaceState(null, "", `#/room/${code}/${idx}/${src}`);
     const list = sourcesOf(r.items[idx]);
-    $("#srcbar").innerHTML = `<span class="note">Now playing</span>` + list.map((u, j) => { const q = parse(u); return `<button type="button" class="chip" data-s="${j}" aria-pressed="${j === src}">${j === 0 ? "Main" : "Backup " + j}<small>${esc(q.label || "Link")}</small></button>`; }).join("") + `<button type="button" class="chip" data-reload>Reload<small>same source</small></button><button type="button" class="chip" data-vlc>Open in VLC<small>copies the link</small></button>`;
+    /* check every source for this video in the background and colour its dot */
+    list.forEach(u => checkLink(u).then(c => { document.querySelectorAll(`[data-dot="${CSS.escape(u)}"]`).forEach(d => { d.className = "dot " + (c ? (c.ok ? (c.status === "live-only" ? "maybe" : "ok") : "no") : ""); d.title = c ? c.note : "Checker not running here"; }); }));
+    /* direct streams that never start within 20 seconds count as dropped */
+    const vid = layer.querySelector("video");
+    if (vid) { const myKey = idx + ":" + src; const stall = setTimeout(() => { if (vid.readyState < 3 && myKey === idx + ":" + src && $("#player").contains(vid)) vid.dispatchEvent(new Event("error")); }, 20000); vid.addEventListener("canplay", () => clearTimeout(stall), { once: true }); }
+    $("#srcbar").innerHTML = `<span class="note">Now playing</span>` + list.map((u, j) => { const q = parse(u); return `<button type="button" class="chip" data-s="${j}" aria-pressed="${j === src}"><span><i class="dot" data-dot="${esc(u)}"></i>${j === 0 ? "Main" : "Backup " + j}</span><small>${esc(q.label || "Link")}</small></button>`; }).join("") + `<button type="button" class="chip" data-reload>Reload<small>same source</small></button><button type="button" class="chip" data-vlc>Open in VLC<small>copies the link</small></button>`;
     $("#queue").innerHTML = r.items.map((it, j) => { const q = parse(it.url); const nb = (it.backups || []).length; return `<li><button data-i="${j}" aria-current="${j === idx}"><b>${esc(it.title)}</b><small>${esc(q.label || "Link")}${q.channel ? " · " + esc(q.channel) : ""}${nb ? " · " + nb + (nb === 1 ? " backup" : " backups") : ""}</small></button></li>`; }).join("");
     const chat = p.kind === "twitch" && p.channel ? `https://www.twitch.tv/embed/${encodeURIComponent(p.channel)}/chat?parent=${encodeURIComponent(host)}&darkpopout` : p.kind === "kick" ? `https://kick.com/popout/${encodeURIComponent(p.channel)}/chat` : "";
     $("#chatCard").hidden = !chat; if (chat && $("#chat").src !== chat) $("#chat").src = chat;
@@ -332,7 +349,7 @@ function room(path) {
   const rowHTML = (it, j) => `<div class="editrow" data-row>
       <div class="editrowhead"><b>Video ${j + 1}</b><span style="display:flex;gap:6px"><button type="button" class="btn alt sm" data-up>↑</button><button type="button" class="btn alt sm" data-down>↓</button><button type="button" class="btn alt sm" data-del>Remove</button></span></div>
       <div class="two"><label>Title<input data-f="title" maxlength="60" value="${esc(it.title || "")}"></label><label>Main link<input data-f="url" required value="${esc(it.url || "")}" placeholder="https://"></label></div>
-      <button type="button" class="btn alt sm" data-find style="justify-self:start">Pull video from main link</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="btn alt sm" data-check>Check links</button><span class="note" data-report></span></div>
       <label>Backup links (one per line)<textarea data-f="backups" placeholder="https://...">${esc((it.backups || []).join("\n"))}</textarea></label>
     </div>`;
   const renderEditor = items => {
@@ -351,17 +368,19 @@ function room(path) {
     const items = readRows(); const row = t.closest("[data-row]"); const j = row ? [...ed.querySelectorAll("[data-row]")].indexOf(row) : -1;
     if (t.id === "edAdd") items.push({ title: "", url: "", backups: [] });
     else if (t.hasAttribute("data-del")) { if (items.length === 1) { toast("A room needs at least one video"); return; } items.splice(j, 1); }
-    else if (t.hasAttribute("data-find")) {
+    else if (t.hasAttribute("data-check")) {
       const it = items[j]; if (!it.url) { toast("Add a main link first"); return; }
-      t.disabled = true; t.textContent = "Looking…";
-      findVideos(it.url).then(f => {
-        t.disabled = false; t.textContent = "Pull video from main link";
-        if (!Array.isArray(f) || !f.length) { toast(Array.isArray(f) ? "No video found in that page" : f.error); return; }
-        const urls = f.map(x => x.url);
-        row.querySelector('[data-f="url"]').value = urls[0];
-        const bk = row.querySelector('[data-f="backups"]');
-        bk.value = [...new Set([...urls.slice(1), ...bk.value.split(/\n+/).map(s => s.trim()).filter(Boolean), it.url])].filter(u => u !== urls[0]).join("\n");
-        toast(`Found ${urls.length} ${urls.length === 1 ? "video" : "videos"}. Extras added as backups`);
+      t.disabled = true; t.textContent = "Checking…";
+      const before = sourcesOf(it);
+      Promise.all(before.map(checkLink)).then(res => {
+        t.disabled = false; t.textContent = "Check links";
+        const rep = row.querySelector("[data-report]");
+        if (res.some(x => x === null)) { rep.textContent = "The checker runs once the site is on Netlify."; return; }
+        verifyItems([it]).then(() => {
+          row.querySelector('[data-f="url"]').value = it.url;
+          row.querySelector('[data-f="backups"]').value = it.backups.join("\n");
+          rep.innerHTML = res.map((c, k) => `<span title="${esc(c.note)}">${c.ok ? "✓" : "✗"} ${k === 0 ? "Main" : "Backup " + k}: ${esc(c.note)}</span>`).join("<br>");
+        });
       });
       return;
     }
@@ -374,8 +393,8 @@ function room(path) {
   ed.addEventListener("submit", async e => {
     e.preventDefault();
     const items = readRows().filter(it => it.url);
-    const sb = ed.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Finding videos…";
-    await resolveItems(items, true);
+    const sb = ed.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Checking links…";
+    await verifyItems(items, true);
     sb.disabled = false; sb.textContent = "Save changes";
     if (!items.length) { toast("Add at least one link"); return; }
     const bad = items.flatMap(it => sourcesOf(it)).find(u => parse(u).kind === "bad");
