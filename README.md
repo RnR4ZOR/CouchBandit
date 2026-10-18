@@ -1,6 +1,6 @@
 # Couchside
 
-Watch-party rooms: name a room, paste a stream link (YouTube videos and playlists, Twitch, Kick, Vimeo, Google Drive, Dropbox, Dailymotion, Streamable, Facebook, .m3u8, .mp4 or any embed code), add backups and share the link with friends.
+Watch-party rooms: name a room, paste a stream link (YouTube videos and playlists, Twitch, Kick, Vimeo, Google Drive, Dropbox, Dailymotion, Streamable, Facebook, .m3u8, .mp4 or any embed code), add backups and share the link with friends. all rooms created are public and shown on the home page
 
 ## Hosting on Cloudflare Pages
 1. In the Cloudflare dashboard go to **Workers & Pages → Create → Pages → Connect to Git** and pick this repo.
