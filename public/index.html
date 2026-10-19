@@ -201,7 +201,7 @@ function parse(url) {
     if (id) return { kind: "embed", url: `https://www.dailymotion.com/embed/video/${id}?autoplay=1`, label: "Dailymotion" };
   }
   if (h === "streamable.com") { const id = u.pathname.split("/").filter(x => x && x !== "e" && x !== "o")[0]; if (id) return { kind: "embed", url: `https://streamable.com/e/${id}?autoplay=1`, label: "Streamable" }; }
-  if ((h.endsWith("facebook.com") && /\/(videos|watch|reel)/.test(u.pathname + u.search)) || h === "fb.watch") return { kind: "embed", url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u.href)}&show_text=false&autoplay=true`, label: "Facebook video" };
+  if ((((h === "facebook.com") || h.endsWith(".facebook.com")) && /\/(videos|watch|reel)/.test(u.pathname + u.search)) || h === "fb.watch") return { kind: "embed", url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u.href)}&show_text=false&autoplay=true`, label: "Facebook video" };
   if (/\.m3u8($|\?)/i.test(u.pathname + u.search)) return { kind: "hls", url: u.href, label: "HLS stream" };
   if (/\.mpd($|\?)/i.test(u.pathname + u.search)) return { kind: "dash", url: u.href, label: "DASH stream" };
   if (/\.flv($|\?)/i.test(u.pathname)) return { kind: "flv", url: u.href, label: "FLV stream" };
