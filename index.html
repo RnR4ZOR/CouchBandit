@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Couchside</title>
+<meta name="description" content="Make a room, drop in a stream link, and send it to your mates.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  /* Retro TV lounge: velvet-couch green, mustard cushions, warm coral, cream */
+  --bg:#0f2a24; --surface:#163830; --raise:#1d463c; --ink:#f6efe1; --muted:#b8c7b9; --line:#285246;
+  --accent:#f2b134; --accent-ink:#2a1c00; --coral:#ff6b57; --live:#ff6b57; --good:#7fdba5;
+  --display:"Young Serif",Georgia,serif; --body:"Figtree",ui-sans-serif,system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(1200px 600px at 85% -10%,rgba(242,177,52,.10),transparent 60%),radial-gradient(900px 500px at -10% 10%,rgba(255,107,87,.08),transparent 60%),var(--bg);background-attachment:fixed;color:var(--ink);font:16px/1.55 var(--body);min-height:100vh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+a{color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;gap:10px;padding-block:12px;flex-wrap:wrap}
+.logo{font:400 22px var(--display);text-decoration:none;margin-right:auto;display:flex;align-items:center;gap:8px}
+.logo b{width:30px;height:22px;border-radius:7px 7px 9px 9px;background:var(--accent);position:relative;box-shadow:0 3px 0 var(--coral)}
+.logo b::after{content:"";position:absolute;left:12px;top:6px;border-left:8px solid var(--accent-ink);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.nav a.l{text-decoration:none;color:var(--muted);font-weight:700;font-size:14px;padding:8px 10px;border-radius:8px}
+.nav a.l:hover{color:var(--ink);background:var(--surface)}
+.btn{border:0;border-radius:999px;padding:11px 16px;font:700 15px var(--body);cursor:pointer;background:var(--accent);color:var(--accent-ink);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn.alt{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
+.btn:hover{filter:brightness(1.06)}
+.btn.alt:hover{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.btn.sm{padding:7px 12px;font-size:13px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent)}
+h1{font-size:clamp(34px,6vw,62px);line-height:1.04}
+h2{font-size:24px}
+.sub{color:var(--muted);margin:0;max-width:60ch}
+.note{font-size:13px;color:var(--muted)}
+main{padding-block:28px 64px;display:grid;gap:36px}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:start}
+@media(max-width:860px){.hero{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:20px;display:grid;gap:14px}
+label{display:grid;gap:5px;font-size:13px;font-weight:700;color:var(--muted)}
+input,select,textarea{font:inherit;font-size:15px;color:var(--ink);background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%}
+textarea{min-height:80px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.two{grid-template-columns:1fr}}
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.room{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:8px;overflow:hidden;text-decoration:none;display:grid;transition:transform .15s,border-color .15s}
+.room:hover{transform:translateY(-2px);border-color:var(--accent)}
+.thumb{aspect-ratio:16/9;max-width:100%;border-radius:16px 16px 22px 22px / 16px 16px 26px 26px;overflow:hidden;box-shadow:inset 0 0 40px rgba(0,0,0,.35);font-family:var(--display);font-weight:400;display:grid;place-items:center;font:800 28px var(--display);color:rgba(255,255,255,.9);position:relative}
+.thumb .src{position:absolute;left:10px;top:10px;font:700 11px var(--body);letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.55);padding:3px 8px;border-radius:5px}
+.thumb .when{position:absolute;right:10px;bottom:10px;font:700 12px var(--body);background:rgba(0,0,0,.6);padding:3px 8px;border-radius:5px}
+.room .meta{padding:10px 8px 6px;display:grid;gap:2px}
+.room .meta span{font-size:13px;color:var(--muted)}
+.empty{border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--muted);text-align:center}
+.secthead{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+/* room view */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media(max-width:960px){.stage{grid-template-columns:1fr}}
+.player{aspect-ratio:16/9;width:100%;background:#000;border-radius:24px;border:6px solid var(--raise);box-shadow:0 0 0 1px var(--line),0 18px 40px rgba(0,0,0,.35);overflow:hidden;position:relative}
+.player iframe,.player video{position:absolute;inset:0;width:100%;height:100%;border:0}
+.player .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted)}
+.player .layer{position:absolute;inset:0}
+.player.full,.player:fullscreen{position:fixed;inset:0;z-index:40;width:100vw;height:100dvh;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
+.player:-webkit-full-screen{width:100%;height:100%;border:0;border-radius:0}
+.player .exitfs{position:absolute;right:calc(10px + env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));z-index:3;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:999px;padding:8px 14px;font:700 14px system-ui;cursor:pointer;display:none}
+.player.full .exitfs{display:block}
+.player .tapfs{position:absolute;inset:0;z-index:2;display:grid;place-items:center;background:rgba(0,0,0,.55);border:0;color:#fff;font:800 20px system-ui;cursor:pointer}
+body.lockscroll{overflow:hidden}
+.player .engine{position:absolute;left:12px;top:12px;font-size:12px;font-weight:700;background:rgba(0,0,0,.6);padding:4px 10px;border-radius:999px;color:var(--ink);pointer-events:none}
+.player .unmute{position:absolute;right:12px;top:12px;z-index:2}
+.player .hint{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:12px;color:var(--muted);background:linear-gradient(transparent,rgba(0,0,0,.85));pointer-events:none;opacity:0;transition:opacity .3s}
+.player:hover .hint{opacity:1}
+.player .hint a{pointer-events:auto;color:var(--accent)}
+.srcbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.srcbar:empty{display:none}
+.chip{display:grid;gap:0;text-align:left;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:6px 12px;font:700 13px var(--body);cursor:pointer}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle;opacity:.6}
+.dot.ok{background:var(--good);opacity:1}.dot.maybe{background:var(--accent);opacity:1}.dot.no{background:var(--coral);opacity:1}
+.chip small{font-weight:500;color:var(--muted);font-size:11px}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.chip[aria-pressed="true"] small{color:var(--accent-ink);opacity:.75}
+.editrow{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;background:var(--bg)}
+.editrowhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.roomhead{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)}
+.live::before{box-shadow:0 0 0 4px rgba(255,107,87,.2);content:"";width:8px;height:8px;border-radius:50%;background:var(--live)}
+.side{display:grid;gap:14px}
+.roomwrap{position:relative;display:grid}.roomwrap .rm{position:absolute;right:8px;top:8px;z-index:2;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:999px;width:30px;height:30px;cursor:pointer;font-weight:800}
+.queue{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.queue button{width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;cursor:pointer;display:grid;gap:2px}
+.queue button[aria-current="true"]{border-color:var(--accent)}
+.queue small{color:var(--muted)}
+.chatframe{width:100%;height:420px;border:0;border-radius:12px;background:var(--bg)}
+.sharebox{display:flex;gap:8px}
+.sharebox input{flex:1;min-width:0;font-size:13px}
+.count{font:400 32px var(--display);color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:700;z-index:20}
+footer{border-top:1px solid var(--line);padding-block:22px;color:var(--muted);font-size:13px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="wrap nav">
+  <a class="logo" href="#/"><b></b>Couchside</a>
+  <a class="l" href="#/">Rooms</a>
+  <a class="l" href="#/new">New room</a>
+</div></header>
+
+<main class="wrap" id="app"></main>
+
+<footer><div class="wrap">Couchside · Watch together. Only share streams you have the right to share.</div></footer>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ===== Featured rooms: edit this list to pin rooms for everyone who visits ===== */
+const FEATURED = [
+  { name: "Lofi study room", host: "Couchside", topic: "Chill beats while you work", items: [{ title: "Lofi radio", url: "https://www.youtube.com/watch?v=jfKfPfyJRdk" }] },
+  { name: "Space station cams", host: "Couchside", topic: "Earth from orbit", items: [{ title: "ISS live view", url: "https://www.youtube.com/watch?v=xRPjKQtRXR8" }] }
+];
+/* ============================================================================ */
+
+const $ = s => document.querySelector(s);
+const app = $("#app");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const dec = s => { try { s = s.replace(/-/g, "+").replace(/_/g, "/"); return JSON.parse(decodeURIComponent(escape(atob(s)))); } catch (e) { return null; } };
+const store = { get() { try { return (JSON.parse(localStorage.getItem("couchside-rooms")) || []).filter(r => !expired(r)); } catch (e) { return []; } },
+  set(v) { try { localStorage.setItem("couchside-rooms", JSON.stringify(v)); } catch (e) {} } };
+const roomLink = r => `${location.origin}${location.pathname}#/room/${enc(r)}`;
+let tt; const toast = m => { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2200); };
+
+/* Work out what kind of stream a link is */
+function cleanLink(raw) {
+  raw = String(raw || "").trim();
+  const m = raw.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i); // pasted embed code
+  if (m) raw = m[1].replace(/&amp;/g, "&");
+  if (raw.startsWith("//")) raw = "https:" + raw;
+  return raw;
+}
+function parse(url) {
+  url = cleanLink(url);
+  if (/^(rtmps?|rtsp|rtp|udp|srt|mms):\/\//i.test(url)) return { kind: "nobrowser", url, label: url.split(":")[0].toUpperCase() + " stream" };
+  let u; try { u = new URL(url); } catch (e) { return { kind: "bad" }; }
+  if (!/^https?:$/.test(u.protocol)) return { kind: "bad" };
+  const h = u.hostname.replace(/^www\.|^m\./, "");
+  if (h === "youtu.be" || h.endsWith("youtube.com") || h.endsWith("youtube-nocookie.com")) {
+    const id = h === "youtu.be" ? u.pathname.split("/")[1] : u.searchParams.get("v") || (u.pathname.match(/\/(live|embed|shorts|v)\/([\w-]+)/) || [])[2];
+    const list = u.searchParams.get("list");
+    const t = u.searchParams.get("t") || u.searchParams.get("start") || "";
+    const tm = t.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
+    const start = tm ? (+tm[1] || 0) * 3600 + (+tm[2] || 0) * 60 + (+tm[3] || 0) : 0;
+    if (id && id !== "videoseries") return { kind: "youtube", id, list, start, label: "YouTube" };
+    if (list) return { kind: "youtube", list, label: "YouTube playlist" };
+  }
+  if (h.endsWith("twitch.tv")) {
+    const vid = u.pathname.match(/\/videos\/(\d+)/);
+    if (vid) return { kind: "twitch", video: vid[1], label: "Twitch" };
+    const ch = u.pathname.split("/").filter(Boolean)[0];
+    if (ch) return { kind: "twitch", channel: ch, label: "Twitch" };
+  }
+  if (h.endsWith("kick.com")) { const ch = u.pathname.split("/").filter(Boolean)[0]; if (ch) return { kind: "kick", channel: ch, label: "Kick" }; }
+  if (h.endsWith("vimeo.com")) { const mm = u.pathname.match(/(\d{5,})(?:\/([0-9a-f]{6,}))?/); if (mm) return { kind: "vimeo", id: mm[1], hash: u.searchParams.get("h") || mm[2] || "", label: "Vimeo" }; }
+  if (h === "drive.google.com" || h === "docs.google.com") {
+    const id = (u.pathname.match(/\/d\/([\w-]{10,})/) || [])[1] || u.searchParams.get("id");
+    if (id) return { kind: "embed", url: `https://drive.google.com/file/d/${id}/preview`, label: "Google Drive" };
+  }
+  if (h.endsWith("dropbox.com") && !h.startsWith("api")) {
+    const d = new URL(u.href); d.searchParams.delete("dl"); d.searchParams.set("raw", "1");
+    return { kind: "file", url: d.href, label: "Dropbox video" };
+  }
+  if (h.endsWith("dailymotion.com") || h === "dai.ly") {
+    const id = h === "dai.ly" ? u.pathname.slice(1) : (u.pathname.match(/\/video\/([a-z0-9]+)/i) || [])[1];
+    if (id) return { kind: "embed", url: `https://www.dailymotion.com/embed/video/${id}?autoplay=1`, label: "Dailymotion" };
+  }
+  if (h === "streamable.com") { const id = u.pathname.split("/").filter(x => x && x !== "e" && x !== "o")[0]; if (id) return { kind: "embed", url: `https://streamable.com/e/${id}?autoplay=1`, label: "Streamable" }; }
+  if ((h.endsWith("facebook.com") && /\/(videos|watch|reel)/.test(u.pathname + u.search)) || h === "fb.watch") return { kind: "embed", url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u.href)}&show_text=false&autoplay=true`, label: "Facebook video" };
+  if (/\.m3u8($|\?)/i.test(u.pathname + u.search)) return { kind: "hls", url: u.href, label: "HLS stream" };
+  if (/\.mpd($|\?)/i.test(u.pathname + u.search)) return { kind: "dash", url: u.href, label: "DASH stream" };
+  if (/\.flv($|\?)/i.test(u.pathname)) return { kind: "flv", url: u.href, label: "FLV stream" };
+  if (/\.ts($|\?)/i.test(u.pathname)) return { kind: "mpegts", url: u.href, label: "TS stream" };
+  if (/\.(mp4|m4v|webm|ogg|ogv|mov|mkv)($|\?)/i.test(u.pathname)) return { kind: "file", url: u.href, label: "Video" };
+  return { kind: "embed", url: u.href, label: h };
+}
+const host = location.hostname || "localhost";
+/* Sandbox for every embedded player: scripts can run, but no pop-ups, new tabs or redirecting this page */
+const SB = `sandbox="allow-scripts allow-same-origin allow-presentation"`;
+/* m = start muted (used for backups loading in the background) */
+function playerHTML(p, m) {
+  switch (p.kind) {
+    case "youtube": return `<iframe ${SB} src="https://www.youtube.com/embed/${p.id ? esc(p.id) + "?" : "videoseries?list=" + encodeURIComponent(p.list) + "&"}autoplay=1&mute=${m ? 1 : 0}&rel=0&playsinline=1${p.id && p.list ? "&list=" + encodeURIComponent(p.list) : ""}${p.start ? "&start=" + p.start : ""}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="YouTube player"></iframe>`;
+    case "twitch": return `<iframe ${SB} src="https://player.twitch.tv/?${p.video ? "video=" + esc(p.video) : "channel=" + esc(p.channel)}&parent=${esc(host)}&autoplay=true&muted=${!!m}" allowfullscreen title="Twitch player"></iframe>`;
+    case "kick": return `<iframe ${SB} src="https://player.kick.com/${esc(p.channel)}?autoplay=true&muted=${!!m}" allowfullscreen allow="autoplay; fullscreen" title="Kick player"></iframe>`;
+    case "vimeo": return `<iframe ${SB} src="https://player.vimeo.com/video/${esc(p.id)}?${p.hash ? "h=" + esc(p.hash) + "&" : ""}autoplay=1&muted=${m ? 1 : 0}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Vimeo player"></iframe>`;
+    case "hls": case "dash": case "flv": case "mpegts": case "file": return `<video controls playsinline autoplay ${m ? "muted" : ""}></video><div class="engine" data-engine>Loading ${esc(p.label)}…</div><button type="button" class="btn sm unmute" data-unmute hidden>Tap for sound</button>`;
+    case "nobrowser": return `<div class="msg"><div style="display:grid;gap:8px;justify-items:center;max-width:420px"><b>${esc(p.label)}</b><span>Web browsers can't play this type of stream. Pick a backup, or ask for an HLS (.m3u8) link instead.</span></div></div>`;
+    case "embed": return `<iframe ${SB} src="${esc(p.url)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="origin" title="Video player"></iframe><div class="hint">Blank screen? That site blocks other sites from showing its player. Try a backup.</div>`;
+    default: return `<div class="msg">That link doesn't look right. Check it and try again.</div>`;
+  }
+}
+/* Playback engines, loaded only when a room needs them */
+const ENGINES = {
+  hls: "https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js",
+  dash: "https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js",
+  mpegts: "https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"
+};
+const loaded = {};
+const loadScript = src => loaded[src] || (loaded[src] = new Promise((ok, no) => { const t = document.createElement("script"); t.src = src; t.onload = ok; t.onerror = () => { delete loaded[src]; no(); }; document.head.appendChild(t); }));
+/* Stream relay (Cloudflare function): fetches streams the browser can't load directly, e.g. plain http:// links
+   on this secure site, servers that don't allow other sites (CORS), or hosts that only serve their own pages */
+const RELAY = "/api/stream";
+const relayed = url => location.origin + RELAY + "?url=" + encodeURIComponent(url);
+const canRelay = /^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname) || location.port === "8889";
+/* Plays a direct stream with the best engine for it. If the direct link fails it retries once through the relay;
+   onFail fires if that fails too, so the room moves to the next backup. */
+async function mountVideo(layer, p, onFail, viaRelay) {
+  let v = layer.querySelector("video"); if (!v) return;
+  const tag = layer.querySelector("[data-engine]");
+  const say = t => { if (tag) { tag.textContent = t; tag.hidden = !t; } };
+  /* http:// media is blocked on an https page, so go straight to the relay */
+  if (!viaRelay && canRelay && location.protocol === "https:" && /^http:/i.test(p.url)) viaRelay = true;
+  const url = viaRelay ? relayed(p.url) : p.url;
+  let failed = false, stall;
+  const fail = () => {
+    if (failed) return; failed = true; clearTimeout(stall);
+    try { layer._destroy && layer._destroy(); } catch (e) {} layer._destroy = null;
+    if (!layer.isConnected) return; // the room already moved to another source
+    if (!viaRelay && canRelay && layer.isConnected) {
+      /* fresh <video> so no old listeners or engine state carry over */
+      const nv = v.cloneNode(false); v.replaceWith(nv);
+      say("Retrying through the Couchside relay…");
+      return mountVideo(layer, p, onFail, true);
+    }
+    say(""); onFail && onFail();
+  };
+  /* a stream that never gets going within 20 seconds counts as dropped */
+  stall = setTimeout(() => { if (layer.isConnected && v.readyState < 3) fail(); }, 20000);
+  v.addEventListener("canplay", () => clearTimeout(stall), { once: true });
+  v.addEventListener("error", fail);
+  v.addEventListener("playing", () => say(""), { once: true });
+  v.addEventListener("loadeddata", () => say(""), { once: true });
+  /* browsers block autoplay with sound until someone interacts, so start muted and offer sound */
+  const unmute = layer.querySelector("[data-unmute]");
+  if (unmute) unmute.onclick = () => { v.muted = false; v.play().catch(() => {}); unmute.hidden = true; };
+  const kick = () => { const pr = v.play(); if (pr && pr.catch) pr.catch(err => { if (err && err.name === "NotAllowedError" && !v.muted) { v.muted = true; v.play().then(() => { if (unmute) unmute.hidden = false; }).catch(() => {}); } }); };
+  v.addEventListener("canplay", kick, { once: true });
+  const via = viaRelay ? " (via relay)" : "";
+  try {
+    if (p.kind === "hls") {
+      const mse = window.MediaSource || window.ManagedMediaSource;
+      if (mse) { await loadScript(ENGINES.hls).catch(() => {}); }
+      if (mse && window.Hls && Hls.isSupported()) {
+        if (failed) return;
+        say("Playing with hls.js" + via);
+        const hls = new Hls({ enableWorker: true, lowLatencyMode: true, manifestLoadingMaxRetry: 2, levelLoadingMaxRetry: 2, fragLoadingMaxRetry: 3 });
+        let recovered = false;
+        hls.on(Hls.Events.ERROR, (e, d) => { if (!d.fatal) return; if (d.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) { recovered = true; hls.recoverMediaError(); } else fail(); });
+        layer._destroy = () => hls.destroy();
+        hls.loadSource(url); hls.attachMedia(v);
+      } else if (v.canPlayType("application/vnd.apple.mpegurl")) { say("Playing with the built-in player" + via); v.src = url; }
+      else return fail();
+    } else if (p.kind === "dash") {
+      await loadScript(ENGINES.dash); shaka.polyfill.installAll();
+      if (!shaka.Player.isBrowserSupported()) return fail();
+      if (failed) return;
+      say("Playing with Shaka Player" + via);
+      const pl = new shaka.Player(); await pl.attach(v);
+      pl.addEventListener("error", e => { if (e.detail && e.detail.severity === 2) fail(); });
+      layer._destroy = () => pl.destroy();
+      await pl.load(url).catch(fail);
+    } else if (p.kind === "flv" || p.kind === "mpegts") {
+      await loadScript(ENGINES.mpegts);
+      if (!mpegts.isSupported()) return fail();
+      if (failed) return;
+      say("Playing with mpegts.js" + via);
+      const pl = mpegts.createPlayer({ type: p.kind, isLive: p.kind === "flv" || !/\.ts($|\?)/i.test(p.url) || /live/i.test(p.url), url }, { enableStashBuffer: false });
+      pl.on(mpegts.Events.ERROR, fail);
+      pl.attachMediaElement(v); pl.load(); Promise.resolve(pl.play()).catch(() => {});
+      layer._destroy = () => { try { pl.destroy(); } catch (e) {} };
+    } else { say(viaRelay ? "Playing via relay" : ""); v.src = url; }
+  } catch (e) { fail(); }
+}
+/* Video finder: pulls the embedded player or stream out of a normal web page (needs the Cloudflare function) */
+const FINDER = "/api/extract";
+async function findVideos(url) {
+  try {
+    const res = await fetch(FINDER + "?url=" + encodeURIComponent(url));
+    const j = await res.json();
+    return res.ok ? (j.found || []) : { error: j.error };
+  } catch (e) { return { error: "The video finder isn't running on this host yet." }; }
+}
+/* Link checker: confirms each link will play, swaps page links for the playable video inside,
+   adds extra videos found on the page as backups, and moves links that won't play to the end */
+const CHECKER = "/api/check";
+const checkCache = {};
+async function checkLink(url) {
+  if (checkCache[url]) return checkCache[url];
+  try { const r = await fetch(CHECKER + "?url=" + encodeURIComponent(url)); if (!r.ok) throw 0; return checkCache[url] = await r.json(); }
+  catch (e) { return null; } // checker not running on this host
+}
+async function verifyItems(items, say) {
+  let good = 0, bad = 0, pulled = 0, offline = false;
+  for (const it of items) {
+    const srcs = [...new Set(sourcesOf(it))];
+    const res = await Promise.all(srcs.map(checkLink));
+    if (res.some(x => x === null)) { offline = true; continue; }
+    const working = [], broken = [];
+    res.forEach((r, j) => {
+      if (r.ok) { working.push(r.url); (r.alternatives || []).forEach(a => working.push(a)); if (r.url !== srcs[j]) pulled++; good++; }
+      else { broken.push(srcs[j]); bad++; }
+    });
+    const all = [...new Set([...working, ...broken])];
+    it.url = all[0]; it.backups = all.slice(1, 12);
+  }
+  if (say) toast(offline ? "Links saved. The link checker runs once the site is on Cloudflare."
+    : `Checked links: ${good} will play${bad ? `, ${bad} won't and moved to the end` : ""}${pulled ? `. Pulled ${pulled} video${pulled === 1 ? "" : "s"} out of pages` : ""}.`);
+  return items;
+}
+const sourcesOf = it => [it.url, ...(it.backups || [])].filter(Boolean);
+const COLORS = [["#f2b134", "#ff6b57"], ["#2f7d6b", "#f2b134"], ["#ff6b57", "#7a3b5c"], ["#3f8f6f", "#9fd8b8"], ["#c9572f", "#f2b134"]];
+const thumbBg = name => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const [a, b] = COLORS[h % COLORS.length]; return `linear-gradient(135deg,${a},${b})`; };
+const initials = n => n.split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
+function startLabel(start) {
+  if (!start) return "";
+  const t = new Date(start), now = new Date();
+  if (t <= now) return "Started";
+  return t.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+}
+function roomCard(r, mine) {
+  const p = parse(r.items[0].url);
+  return `<div class="roomwrap">${r.id && mine ? `<button type="button" class="rm" data-rm="${esc(keyOf(r))}" aria-label="Delete room">✕</button>` : ""}<a class="room" href="#/room/${enc(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${esc(p.label || "Stream")}</span>${initials(r.name)}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
+    <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " video" : " videos")))} · by ${esc(r.host || "you")}</span></div></a></div>`;
+}
+
+/* ===== Pages ===== */
+function home() {
+  const mine = store.get();
+  app.innerHTML = `
+  <section class="hero">
+    <div style="display:grid;gap:16px;align-content:start">
+      <h1>Make a room. Drop a stream. <em>Send the link.</em></h1>
+      <p class="sub">Paste a YouTube, Twitch, Kick or Vimeo link, or a direct .m3u8 or .mp4 stream. Couchside turns it into a room your mates can open on any phone or laptop, no sign-up needed.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="#/new">Create a room</a><a class="btn alt" href="#rooms">Browse rooms</a></div>
+    </div>
+    ${quickForm()}
+  </section>
+  <section id="rooms">
+    <div class="secthead"><h2>Your rooms</h2>${mine.length ? `<button class="btn alt sm" id="clearMine">Clear list</button>` : ""}</div>
+    ${mine.length ? `<div class="rooms">${mine.map(r => roomCard(r, true)).join("")}</div>` : `<div class="empty">Rooms you create show up here. They delete themselves 48 hours after the event.</div>`}
+  </section>
+  <section>
+    <div class="secthead"><h2>Open rooms</h2><span class="note">Everyone's rooms, open to anyone with the link</span></div>
+    <div id="openRooms"><div class="empty">Loading rooms…</div></div>
+  </section>
+  <section>
+    <div class="secthead"><h2>Featured rooms</h2><span class="note">Open to everyone who visits</span></div>
+    <div class="rooms">${FEATURED.map(roomCard).join("")}</div>
+  </section>`;
+  bindQuick();
+  const c = $("#clearMine"); if (c) c.onclick = () => { if (!confirm("Remove all rooms from this list? Saved rooms are deleted for good.")) return; store.get().forEach(x => x.id && cloudDelete(x.id)); store.set([]); home(); toast("List cleared"); };
+  /* publish older rooms on this device that were never saved to the server */
+  const local = store.get(); let changed = false;
+  local.forEach(r => { if (!r.id) { r.id = newId(); r.created = r.created || Date.now(); changed = true; cloudSave(r); } });
+  if (changed) store.set(local);
+  cloudList().then(list => {
+    const box = $("#openRooms"); if (!box) return;
+    const rooms = (list || []).filter(r => !expired(r)), mineIds = new Set(store.get().map(x => x.id).filter(Boolean));
+    box.innerHTML = rooms.length ? `<div class="rooms">${rooms.map(r => roomCard(r, mineIds.has(r.id))).join("")}</div>` : `<div class="empty">${list ? "No rooms open right now. Make one above." : "Couldn't load rooms. Refresh to try again."}</div>`;
+  });
+}
+document.addEventListener("click", e => homeClicks(e));
+function homeClicks(e) {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  e.preventDefault(); if (!confirm("Delete this room?")) return;
+  const k = b.dataset.rm; forget(k); cloudDelete(k); home(); toast("Room deleted");
+}
+function quickForm(full) {
+  return `<form class="card" id="qf">
+    <h2>${full ? "Set up your room" : "Quick room"}</h2>
+    <label>Room name<input id="q_name" required maxlength="60" placeholder="Friday fight night"></label>
+    <label>Stream link or embed code<input id="q_url" required placeholder="https://www.twitch.tv/yourchannel"></label>
+    ${full ? `
+    <div class="two"><label>Your name<input id="q_host" maxlength="40" placeholder="Mark"></label>
+    <label>Starts at (optional)<input id="q_start" type="datetime-local"></label></div>
+    <label>What's on<input id="q_topic" maxlength="80" placeholder="Main card, pre-show chat from 7"></label>
+    <label>Backup links for the main stream (optional, one per line)<textarea id="q_backups" placeholder="If the main link drops, the room switches to these"></textarea></label>
+    <label>Up next (optional, one link per line)<textarea id="q_more" placeholder="https://youtu.be/...&#10;https://youtu.be/..."></textarea></label>` : ""}
+    <p class="note" id="q_detect">Paste a link or embed code and I'll check it.</p>
+    <button class="btn" type="submit">Create room</button>
+  </form>`;
+}
+function bindQuick() {
+  const f = $("#qf"); if (!f) return;
+  $("#q_url").addEventListener("input", e => {
+    const p = parse(e.target.value);
+    $("#q_detect").textContent = !e.target.value ? "Paste a link or embed code and I'll check it." : p.kind === "bad" ? "That isn't a full link yet. It should start with https://" : p.kind === "nobrowser" ? `${p.label}: web browsers can't play this type. Use an HLS (.m3u8) link if you can.` : p.kind === "embed" ? `Web page from ${p.label}. I'll pull the video out of it when you create the room.` : `Looks good: ${p.label}${p.channel ? " channel " + p.channel : ""}.`;
+  });
+  f.addEventListener("submit", async e => {
+    e.preventDefault();
+    const sb = f.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Checking links…";
+    const bk = $("#q_backups");
+    const items = [{ title: "Main stream", url: cleanLink($("#q_url").value), backups: bk ? bk.value.split(/\n+/).map(cleanLink).filter(Boolean) : [] }];
+    const more = $("#q_more"); if (more) more.value.split(/\n+/).map(s => s.trim()).filter(Boolean).forEach((u, i) => items.push({ title: "Up next " + (i + 1), url: cleanLink(u), backups: [] }));
+    const r = { name: $("#q_name").value.trim(), host: ($("#q_host") || {}).value?.trim() || "", topic: ($("#q_topic") || {}).value?.trim() || "", start: ($("#q_start") || {}).value || "", items };
+    await verifyItems(r.items, true);
+    sb.disabled = false;
+    r.id = newId(); r.created = Date.now(); remember(r); cloudSave(r).then(ok => toast(ok ? "Room saved" : "Saved on this device")); location.hash = "#/room/" + enc(r);
+  });
+}
+const keyOf = r => r.id || enc(r);
+/* Rooms delete themselves 48 hours after the event is over (event = start time + 6 hours).
+   Rooms with no start time go 48 hours after they were made. */
+const HOUR = 3600e3;
+const expiresAt = r => r.start && !isNaN(new Date(r.start)) ? new Date(r.start).getTime() + 54 * HOUR : r.created ? r.created + 48 * HOUR : Infinity;
+const expired = r => Date.now() > expiresAt(r);
+function remember(r) { const k = keyOf(r); const list = store.get().filter(x => keyOf(x) !== k); list.unshift(r); store.set(list.slice(0, 50)); }
+/* ===== Saved rooms: kept on this device and on the server, so they survive reloads, cleared data and other devices ===== */
+try { navigator.storage?.persist?.(); } catch (e) {}
+const newId = () => Math.random().toString(36).slice(2, 10).padEnd(8, "0");
+const API = "/api/rooms";
+async function cloudSave(r) { try { const res = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ room: r }) }); return res.ok; } catch (e) { return false; } }
+async function cloudList() { try { const res = await fetch(API, { cache: "no-store" }); return res.ok ? await res.json() : null; } catch (e) { return null; } }
+async function cloudDelete(id) { try { await fetch(API + "?id=" + encodeURIComponent(id), { method: "DELETE" }); } catch (e) {} }
+function forget(k) { store.set(store.get().filter(x => keyOf(x) !== k)); }
+function newRoom() { app.innerHTML = `<section style="max-width:640px;width:100%;margin:0 auto;display:grid;gap:16px"><a href="#/" class="note">← All rooms</a>${quickForm(true)}<p class="note">Everything about the room lives in its link, so anyone you send it to sees the same stream and line-up.</p></section>`; bindQuick(); }
+let timer;
+/* ===== Full screen: real full screen where the browser allows it,
+   otherwise (iPhone) the player fills the whole screen inside the page ===== */
+let wantFull = false;
+document.addEventListener("click", e => { if (e.target.closest('a[href^="#/room/"]')) wantFull = true; }, true);
+function goFull() {
+  const el = $("#player"); if (!el) return;
+  $("#tapFs")?.remove();
+  if (document.fullscreenElement || document.webkitFullscreenElement || el.classList.contains("full")) return;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  const fallback = () => { el.classList.add("full"); document.body.classList.add("lockscroll"); };
+  if (!req) return fallback();
+  try {
+    const r = req.call(el, { navigationUI: "hide" });
+    if (r && r.then) r.then(() => screen.orientation?.lock?.("landscape").catch(() => {}), fallback);
+  } catch { fallback(); }
+}
+function exitFull() {
+  $("#player")?.classList.remove("full"); document.body.classList.remove("lockscroll");
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.();
+}
+addEventListener("keydown", e => { if (e.key === "Escape") exitFull(); });
+addEventListener("hashchange", () => document.body.classList.remove("lockscroll"));
+
+function room(path) {
+  const [code, si, ss] = path.split("/");
+  const r = dec(code);
+  if (!r || !Array.isArray(r.items) || !r.items.length) { app.innerHTML = `<div class="empty">This room link is broken or incomplete. Ask whoever sent it to copy it again.<br><br><a class="btn" href="#/">Back to rooms</a></div>`; return; }
+  remember(r);
+  let idx = 0, src = 0; const link = roomLink(r);
+  app.innerHTML = `
+  <a href="#/" class="note">← All rooms</a>
+  <div class="roomhead"><div style="display:grid;gap:4px"><span class="live" id="liveTag">Room open</span><h1 style="font-size:clamp(26px,4vw,40px)">${esc(r.name)}</h1><span class="note">${esc(r.topic || "")}${r.host ? (r.topic ? " · " : "") + "Hosted by " + esc(r.host) : ""}</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
+  <div class="stage">
+    <div style="display:grid;gap:12px;min-width:0">
+      <div class="player" id="player"><button type="button" class="tapfs" id="tapFs">▶ Tap to watch full screen</button><button type="button" class="exitfs" id="exitFs">✕ Exit full screen</button></div>
+      <div class="srcbar" id="srcbar"></div>
+      <div id="countdown" class="card" hidden></div>
+      <form class="card" id="editor" hidden></form>
+    </div>
+    <aside class="side">
+      <div class="card"><h3>Invite your mates</h3><div class="sharebox"><input id="shareLink" readonly value="${esc(link)}" aria-label="Room link"><button class="btn sm" id="copyBtn">Copy</button></div><span class="note">Anyone with this link can join. No account needed.</span></div>
+      <div class="card"><h3>Line-up</h3><ul class="queue" id="queue"></ul></div>
+      <div class="card" id="chatCard" hidden><h3>Chat</h3><iframe class="chatframe" id="chat" sandbox="allow-scripts allow-same-origin allow-forms" title="Stream chat"></iframe></div>
+    </aside>
+  </div>`;
+
+  /* Universal player: one frame. Picking a source reloads the player with only that source. */
+  function show(i, s, quiet) {
+    const srcs = sourcesOf(r.items[i]);
+    idx = Math.min(Math.max(0, i), r.items.length - 1); src = Math.min(Math.max(0, s), sourcesOf(r.items[idx]).length - 1);
+    const p = parse(sourcesOf(r.items[idx])[src]);
+    const old = $("#player").querySelector(".layer"); old?._destroy?.();
+    $("#player").querySelectorAll(".layer").forEach(l => l.remove());
+    $("#player").insertAdjacentHTML("afterbegin", `<div class="layer on">${playerHTML(p)}</div>`);
+    const layer = $("#player").querySelector(".layer");
+    mountVideo(layer, p, () => { const n = sourcesOf(r.items[idx]).length; if (src + 1 < n) { toast("Stream dropped. Loading backup " + (src + 1)); show(idx, src + 1); } else { toast("None of the links played. Add a working backup in Edit room."); } });
+    history.replaceState(null, "", `#/room/${code}/${idx}/${src}`);
+    const list = sourcesOf(r.items[idx]);
+    /* check every source for this video in the background and colour its dot */
+    list.forEach(u => checkLink(u).then(c => { document.querySelectorAll(`[data-dot="${CSS.escape(u)}"]`).forEach(d => { d.className = "dot " + (c ? (c.ok ? (c.status === "live-only" ? "maybe" : "ok") : "no") : ""); d.title = c ? c.note : "Checker not running here"; }); }));
+    $("#srcbar").innerHTML = `<span class="note">Now playing</span>` + list.map((u, j) => { const q = parse(u); return `<button type="button" class="chip" data-s="${j}" aria-pressed="${j === src}"><span><i class="dot" data-dot="${esc(u)}"></i>${j === 0 ? "Main" : "Backup " + j}</span><small>${esc(q.label || "Link")}</small></button>`; }).join("") + `<button type="button" class="chip" data-reload>Reload<small>same source</small></button>`;
+    $("#queue").innerHTML = r.items.map((it, j) => { const q = parse(it.url); const nb = (it.backups || []).length; return `<li><button data-i="${j}" aria-current="${j === idx}"><b>${esc(it.title)}</b><small>${esc(q.label || "Link")}${q.channel ? " · " + esc(q.channel) : ""}${nb ? " · " + nb + (nb === 1 ? " backup" : " backups") : ""}</small></button></li>`; }).join("");
+    const chat = p.kind === "twitch" && p.channel ? `https://www.twitch.tv/embed/${encodeURIComponent(p.channel)}/chat?parent=${encodeURIComponent(host)}&darkpopout` : p.kind === "kick" ? `https://kick.com/popout/${encodeURIComponent(p.channel)}/chat` : "";
+    $("#chatCard").hidden = !chat; if (chat && $("#chat").src !== chat) $("#chat").src = chat;
+    if (!quiet && list.length > 1) toast(src === 0 ? "Main stream loaded" : "Backup " + src + " loaded");
+  }
+  $("#queue").addEventListener("click", e => { const b = e.target.closest("button"); if (b) goFull(), show(+b.dataset.i, 0, true); });
+  $("#srcbar").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; goFull(); if (b.hasAttribute("data-reload")) show(idx, src); else show(idx, +b.dataset.s); });
+  $("#tapFs").onclick = () => goFull();
+  $("#exitFs").onclick = () => exitFull();
+  if (wantFull) { wantFull = false; goFull(); }
+  $("#copyBtn").onclick = () => { const sel = () => { $("#shareLink").select(); toast("Link selected, copy it"); }; navigator.clipboard ? navigator.clipboard.writeText(link).then(() => toast("Link copied"), sel) : sel(); };
+  $("#shareBtn").onclick = async () => { if (navigator.share) { try { await navigator.share({ title: r.name, text: `Join my room on Couchside: ${r.name}`, url: link }); } catch (e) {} } else $("#copyBtn").click(); };
+  $("#fsBtn").onclick = () => goFull();
+
+  /* ===== Edit room: rename, change links, add or remove backups and videos ===== */
+  const ed = $("#editor");
+  const rowHTML = (it, j) => `<div class="editrow" data-row>
+      <div class="editrowhead"><b>Video ${j + 1}</b><span style="display:flex;gap:6px"><button type="button" class="btn alt sm" data-up>↑</button><button type="button" class="btn alt sm" data-down>↓</button><button type="button" class="btn alt sm" data-del>Remove</button></span></div>
+      <div class="two"><label>Title<input data-f="title" maxlength="60" value="${esc(it.title || "")}"></label><label>Main link<input data-f="url" required value="${esc(it.url || "")}" placeholder="https://"></label></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="btn alt sm" data-check>Check links</button><span class="note" data-report></span></div>
+      <label>Backup links (one per line)<textarea data-f="backups" placeholder="https://...">${esc((it.backups || []).join("\n"))}</textarea></label>
+    </div>`;
+  const renderEditor = items => {
+    ed.innerHTML = `<div class="secthead" style="margin:0"><h2>Edit room</h2><button type="button" class="btn alt sm" id="edClose">Close</button></div>
+      <div class="two"><label>Room name<input id="ed_name" required maxlength="60" value="${esc(r.name)}"></label><label>Your name<input id="ed_host" maxlength="40" value="${esc(r.host || "")}"></label></div>
+      <div class="two"><label>What's on<input id="ed_topic" maxlength="80" value="${esc(r.topic || "")}"></label><label>Starts at<input id="ed_start" type="datetime-local" value="${esc(r.start || "")}"></label></div>
+      <div id="edRows" style="display:grid;gap:12px">${items.map(rowHTML).join("")}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt" id="edAdd">Add video</button><button class="btn" type="submit">Save changes</button></div>
+      <p class="note">Saving gives the room a new link. Send the new link to your mates so they see the changes.</p>`;
+  };
+  const readRows = () => [...ed.querySelectorAll("[data-row]")].map((row, j) => ({ title: row.querySelector('[data-f="title"]').value.trim() || "Video " + (j + 1), url: cleanLink(row.querySelector('[data-f="url"]').value), backups: row.querySelector('[data-f="backups"]').value.split(/\n+/).map(cleanLink).filter(Boolean) }));
+  $("#editBtn").onclick = () => { if (ed.hidden) { renderEditor(r.items); ed.hidden = false; ed.scrollIntoView({ behavior: "smooth", block: "start" }); } else ed.hidden = true; };
+  ed.addEventListener("click", e => {
+    const t = e.target;
+    if (t.id === "edClose") { ed.hidden = true; return; }
+    const items = readRows(); const row = t.closest("[data-row]"); const j = row ? [...ed.querySelectorAll("[data-row]")].indexOf(row) : -1;
+    if (t.id === "edAdd") items.push({ title: "", url: "", backups: [] });
+    else if (t.hasAttribute("data-del")) { if (items.length === 1) { toast("A room needs at least one video"); return; } items.splice(j, 1); }
+    else if (t.hasAttribute("data-check")) {
+      const it = items[j]; if (!it.url) { toast("Add a main link first"); return; }
+      t.disabled = true; t.textContent = "Checking…";
+      const before = sourcesOf(it);
+      Promise.all(before.map(checkLink)).then(res => {
+        t.disabled = false; t.textContent = "Check links";
+        const rep = row.querySelector("[data-report]");
+        if (res.some(x => x === null)) { rep.textContent = "The checker runs once the site is on Cloudflare."; return; }
+        verifyItems([it]).then(() => {
+          row.querySelector('[data-f="url"]').value = it.url;
+          row.querySelector('[data-f="backups"]').value = it.backups.join("\n");
+          rep.innerHTML = res.map((c, k) => `<span title="${esc(c.note)}">${c.ok ? "✓" : "✗"} ${k === 0 ? "Main" : "Backup " + k}: ${esc(c.note)}</span>`).join("<br>");
+        });
+      });
+      return;
+    }
+    else if (t.hasAttribute("data-up") && j > 0) [items[j - 1], items[j]] = [items[j], items[j - 1]];
+    else if (t.hasAttribute("data-down") && j < items.length - 1) [items[j + 1], items[j]] = [items[j], items[j + 1]];
+    else return;
+    const keep = { name: $("#ed_name").value, host: $("#ed_host").value, topic: $("#ed_topic").value, start: $("#ed_start").value };
+    renderEditor(items); $("#ed_name").value = keep.name; $("#ed_host").value = keep.host; $("#ed_topic").value = keep.topic; $("#ed_start").value = keep.start;
+  });
+  ed.addEventListener("submit", async e => {
+    e.preventDefault();
+    const items = readRows().filter(it => it.url);
+    const sb = ed.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Checking links…";
+    await verifyItems(items, true);
+    sb.disabled = false; sb.textContent = "Save changes";
+    if (!items.length) { toast("Add at least one link"); return; }
+    const bad = items.flatMap(it => sourcesOf(it)).find(u => parse(u).kind === "bad");
+    if (bad) { toast("Fix this link first: " + bad.slice(0, 40)); return; }
+    const nr = { id: r.id || newId(), created: r.created || Date.now(), name: $("#ed_name").value.trim() || r.name, host: $("#ed_host").value.trim(), topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
+    forget(keyOf(r)); remember(nr); cloudSave(nr);
+    location.hash = "#/room/" + enc(nr); setTimeout(() => toast("Saved. Share the new link"), 50);
+  });
+
+  show(+si || 0, +ss || 0, true);
+  clearInterval(timer);
+  if (r.start && new Date(r.start) > new Date()) {
+    const cd = $("#countdown"); cd.hidden = false; $("#liveTag").textContent = "Starting soon";
+    const tick = () => { const ms = new Date(r.start) - new Date(); if (ms <= 0) { cd.innerHTML = `<span class="count">We're on.</span><span class="note">Hit play and enjoy.</span>`; $("#liveTag").textContent = "Live now"; clearInterval(timer); return; }
+      const h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4), s = Math.floor(ms % 6e4 / 1e3);
+      cd.innerHTML = `<span class="note">Party starts in</span><span class="count">${h ? h + "h " : ""}${m}m ${String(s).padStart(2, "0")}s</span><span class="note">${new Date(r.start).toLocaleString(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" })} your time</span>`; };
+    tick(); timer = setInterval(tick, 1000);
+  }
+}
+
+function route() {
+  clearInterval(timer);
+  const h = location.hash || "#/";
+  if (h.startsWith("#/room/")) room(h.slice(7));
+  else if (h === "#/new") newRoom();
+  else if (h === "#rooms") { home(); document.getElementById("rooms")?.scrollIntoView(); return; }
+  else home();
+  window.scrollTo(0, 0);
+}
+addEventListener("hashchange", route);
+route();
+</script>
+<div id="braveGate" hidden style="position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:16px">
+  <div class="card" style="max-width:420px;display:grid;gap:12px;text-align:center">
+    <h2>Turn on ad blocking</h2>
+    <p class="sub">Streams here can carry ads. Open Couchside in Brave (ad blocking built in), or switch on an ad blocker and reload.</p>
+    <a class="btn" id="openBrave" href="#">Open in Brave</a>
+    <a class="btn alt" href="https://brave.com/download/" rel="noopener">Get Brave</a>
+    <p class="note">Already in Brave? Make sure Shields are on, then reload.</p>
+  </div>
+</div>
+<script>
+/* Brave-only gate.
+   Desktop + Android: Brave exposes navigator.brave.
+   iPhone/iPad: Brave looks identical to Safari, so we test for Brave Shields instead:
+   it blocks a known ad script that plain Safari loads fine. */
+(async () => {
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  let brave = false;
+  try { brave = !!(navigator.brave && await navigator.brave.isBrave()); } catch {}
+  if (!brave) brave = await adsBlocked(); /* any browser that blocks ads is fine */
+  if (brave) return;
+  const g = document.getElementById("braveGate"); g.hidden = false;
+  const url = location.href, open = document.getElementById("openBrave");
+  if (/Android/i.test(ua)) open.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.brave.browser;end";
+  else if (ios) open.href = "brave://open-url?url=" + encodeURIComponent(url);
+  else { open.removeAttribute("href"); open.textContent = "Copy link, then paste it in Brave"; open.onclick = () => { navigator.clipboard?.writeText(url); open.textContent = "Link copied"; }; }
+})();
+function adsBlocked() {
+  const probe = fetch("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?cs=" + Date.now(), { mode: "no-cors", cache: "no-store" })
+    .then(() => false, () => true);
+  const timeout = new Promise(r => setTimeout(() => r(true), 4000));
+  return Promise.race([probe, timeout]);
+}
+</script>
+</body>
+</html>
