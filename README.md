@@ -20,3 +20,16 @@ In a room, each source shows a dot: green plays, yellow plays when the channel i
 Playback engines (loaded only when needed): YouTube, Twitch, Kick and Vimeo embeds; hls.js for .m3u8; Shaka Player for DASH (.mpd); mpegts.js for .flv and .ts; the browser's own player for .mp4 and .webm. RTMP and RTSP links can't play in browsers and are flagged as won't play.
 
 Only share streams you have the right to share.
+
+## Couch Bandit on Cloudflare (log in anywhere, no GitHub key)
+
+The same code runs on GitHub Pages and Cloudflare Pages. On Cloudflare the owner login is checked by the server and rooms are saved on the server, so Masterkey can log in on any device and save straight away.
+
+1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git** → pick **CouchBandit**. Build command: none. Build output directory: `public`. Deploy.
+2. **Storage & Databases → KV → Create namespace** (any name, e.g. `couchbandit-rooms`). In the Pages project: **Settings → Bindings → Add → KV namespace**, variable name `ROOMS`, pick that namespace.
+3. In the Pages project: **Settings → Variables and Secrets → Add**, type **Secret**:
+   - `OWNER_USER` = your owner username
+   - `OWNER_PASS` = your owner password
+4. **Deployments → Retry deployment** (so the settings take effect).
+
+The first time you open the Cloudflare site it shows the rooms from `rooms.json`; your first save copies them onto the server.

@@ -1,39 +1,32 @@
-// Couchside saved rooms: /api/rooms (Cloudflare Pages Function, rooms kept in the ROOMS KV namespace)
-// GET lists saved rooms, POST {room} saves one (room.id required), DELETE ?id= removes one.
-const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-const HOUR = 3600e3;
-// Delete 48 hours after the event ends (start + 6 h), or 48 hours after creation if there is no start time
-const expiresAt = r => r.start && !isNaN(new Date(r.start)) ? new Date(r.start).getTime() + 54 * HOUR : (r.created || r.saved || 0) + 48 * HOUR;
-const okId = id => typeof id === "string" && /^[a-z0-9]{6,16}$/.test(id);
+// Couch Bandit room list on Cloudflare: /api/rooms
+// GET  -> the room list (anyone)
+// PUT  [rooms] -> replace the room list (owner only, signed pass from /api/login)
+// The list is kept in the ROOMS KV namespace under one key.
+import { isOwner, json } from "./_auth.js";
+const KEY = "room-list";
+
+const clean = list => (Array.isArray(list) ? list : []).filter(r => r && typeof r.id === "string" && /^[a-z0-9]{4,16}$/.test(r.id) && Array.isArray(r.items) && r.items.length)
+  .slice(0, 200).map(r => ({
+    id: r.id, created: +r.created || Date.now(), featured: !!r.featured,
+    name: String(r.name || "Room").slice(0, 60), topic: String(r.topic || "").slice(0, 80), start: String(r.start || "").slice(0, 20),
+    items: r.items.slice(0, 30).map((it, j) => ({
+      title: String(it.title || "Stream " + (j + 1)).slice(0, 60),
+      url: String(it.url || "").slice(0, 2000),
+      backups: (Array.isArray(it.backups) ? it.backups : []).slice(0, 15).map(u => String(u).slice(0, 2000))
+    })).filter(it => /^https?:\/\//i.test(it.url))
+  })).filter(r => r.items.length);
 
 export async function onRequest({ request, env }) {
   const kv = env.ROOMS;
   if (!kv) return json({ error: "Room storage isn't connected. Bind a KV namespace named ROOMS in Cloudflare." }, 503);
-  if (request.method === "GET") {
-    const keys = [];
-    let cursor;
-    do { const page = await kv.list({ cursor }); keys.push(...page.keys); cursor = page.list_complete ? null : page.cursor; } while (cursor);
-    const all = (await Promise.all(keys.map(k => kv.get(k.name, "json")))).filter(Boolean);
-    const now = Date.now(), rooms = [];
-    for (const r of all) { if (now > expiresAt(r)) await kv.delete(r.id); else rooms.push(r); }
-    rooms.sort((a, b) => (b.saved || 0) - (a.saved || 0));
-    return json(rooms.slice(0, 100));
-  }
-  if (request.method === "POST") {
-    let room; try { ({ room } = await request.json()); } catch { return json({ error: "bad body" }, 400); }
-    if (!room || !okId(room.id) || !Array.isArray(room.items) || !room.items.length) return json({ error: "bad room" }, 400);
-    const text = JSON.stringify(room); if (text.length > 20000) return json({ error: "too big" }, 413);
-    const saved = { ...room, saved: Date.now() };
-    // KV removes the room by itself once it expires (at least a minute from now)
-    const expiration = Math.max(Math.floor(expiresAt(saved) / 1000), Math.floor(Date.now() / 1000) + 120);
-    await kv.put(room.id, JSON.stringify(saved), { expiration });
-    return json({ ok: true, id: room.id });
-  }
-  if (request.method === "DELETE") {
-    const id = new URL(request.url).searchParams.get("id");
-    if (!okId(id)) return json({ error: "bad id" }, 400);
-    await kv.delete(id);
-    return json({ ok: true });
+  if (request.method === "GET") return json((await kv.get(KEY, "json")) || []);
+  if (request.method === "PUT") {
+    if (!(await isOwner(request, env))) return json({ error: "Log in as owner again." }, 401);
+    let list; try { list = await request.json(); } catch { return json({ error: "bad body" }, 400); }
+    const rooms = clean(list);
+    const text = JSON.stringify(rooms); if (text.length > 900000) return json({ error: "too big" }, 413);
+    await kv.put(KEY, text);
+    return json({ ok: true, count: rooms.length });
   }
   return json({ error: "method" }, 405);
 }

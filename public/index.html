@@ -359,11 +359,24 @@ const expired = () => false;
 
 /* ===== Room list: lives in rooms.json next to this page. Everyone reads it; only the owner can change it. ===== */
 let ROOMS = [];
+/* Two ways to run: on Cloudflare the server keeps the rooms and checks the owner login (no GitHub key needed);
+   on GitHub Pages the rooms live in rooms.json and saving goes through GitHub. */
+let SERVER = null;
+const serverMode = () => SERVER || (SERVER = fetch("api/login", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => !!(j && j.server)).catch(() => false));
+const okRoom = r => r && r.id && Array.isArray(r.items) && r.items.length;
 async function loadRooms() {
-  try { const res = await fetch("rooms.json?v=" + Date.now(), { cache: "no-store" }); if (res.ok) { const j = await res.json(); ROOMS = Array.isArray(j) ? j.filter(r => r && r.id && Array.isArray(r.items) && r.items.length) : []; } }
-  catch (e) {}
+  try {
+    let list = null;
+    if (await serverMode()) { const res = await fetch("api/rooms", { cache: "no-store" }); if (res.ok) list = await res.json(); }
+    /* first run on Cloudflare: show the rooms from rooms.json until the owner saves */
+    if (!list || !list.length) { const res = await fetch("rooms.json?v=" + Date.now(), { cache: "no-store" }); if (res.ok) list = await res.json(); }
+    if (Array.isArray(list)) ROOMS = list.filter(okRoom);
+  } catch (e) {}
   return ROOMS;
 }
+/* Owner pass from the Cloudflare login, kept on this device for 30 days */
+const getPass = () => { try { const p = localStorage.getItem("cb-pass") || ""; const m = /^owner\.(\d+)\./.exec(p); return m && Date.now() < +m[1] ? p : ""; } catch (e) { return ""; } };
+const setPass = p => { try { p ? localStorage.setItem("cb-pass", p) : localStorage.removeItem("cb-pass"); } catch (e) {} };
 const byId = id => ROOMS.find(r => r.id === id);
 const roomHref = r => r.id && byId(r.id) ? `#/r/${encodeURIComponent(r.id)}` : `#/room/${enc(r)}`;
 const roomLink = r => `${location.origin}${location.pathname}${roomHref(r)}`;
@@ -401,17 +414,26 @@ async function importKeyCode(code) {
 }
 const cleanKey = k =>String(k || "").replace(/[\s"'`\u200b-\u200d\ufeff]/g, "").replace(/[^\x21-\x7e]/g, "");
 async function login(user, pass) {
+  if (await serverMode()) {
+    try {
+      const r = await fetch("api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ user, pass }) });
+      if (r.status === 401) return false;
+      const j = await r.json();
+      if (r.ok && j.pass) { setPass(j.pass); isOwner = true; return true; }
+    } catch (e) {}
+    /* owner login not set up on the server yet: fall through to the built-in check */
+  }
   const h = hex(await pbkdf2(user + ":" + pass, OWNER.salt, OWNER.iter));
   if (h !== OWNER.hash) return false;
   isOwner = true; ownerPass = pass; ownerToken = cleanKey(await unlockToken());
   try { sessionStorage.setItem("cb-owner", "1"); } catch (e) {}
   return true;
 }
-function logout() { isOwner = false; ownerPass = ""; ownerToken = ""; try { sessionStorage.removeItem("cb-owner"); } catch (e) {} paintNav(); route(); toast("Logged out"); }
+function logout() { setPass(""); isOwner = false; ownerPass = ""; ownerToken = ""; try { sessionStorage.removeItem("cb-owner"); } catch (e) {} paintNav(); route(); toast("Logged out"); }
 function paintNav() {
   $("#ownerBtn").textContent = isOwner ? "Log out" : "Owner login";
   $("#addNav").hidden = !isOwner;
-  $("#keyBtn").hidden = !isOwner;
+  $("#keyBtn").hidden = !isOwner || SERVER_ON;
 }
 $("#keyBtn").onclick = async () => {
   if (!ownerToken && !(await askToken())) return;
@@ -439,6 +461,14 @@ $("#loginForm").addEventListener("submit", async e => {
 /* Save the room list for everyone: writes rooms.json to the site through GitHub. Live for everyone in about a minute. */
 async function saveRooms(list, msg) {
   if (!isOwner) { toast("Only the owner can change rooms"); return false; }
+  if (getPass()) {
+    try {
+      const r = await fetch("api/rooms", { method: "PUT", headers: { "content-type": "application/json", Authorization: "Bearer " + getPass() }, body: JSON.stringify(list) });
+      if (r.status === 401) { setPass(""); isOwner = false; paintNav(); toast("Your owner login expired. Log in again.", 6000); return false; }
+      if (!r.ok) { let why = ""; try { why = (await r.json()).error || ""; } catch (e) {} toast("Couldn't save (" + r.status + (why ? ": " + why : "") + ").", 7000); return false; }
+      ROOMS = list; toast("Saved for everyone"); return true;
+    } catch (e) { toast("Couldn't reach the server. Check your connection.", 6000); return false; }
+  }
   if (!ownerToken && !(await askToken())) return false;
   const api = `https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/${REPO.path}`;
   const hdr = { Authorization: "Bearer " + ownerToken, Accept: "application/vnd.github+json" };
@@ -702,8 +732,11 @@ async function route() {
   window.scrollTo(0, 0);
 }
 addEventListener("hashchange", route);
+let SERVER_ON = false;
 paintNav();
 route();
+/* On Cloudflare a saved owner pass keeps you logged in on this device */
+serverMode().then(on => { SERVER_ON = on; if (on && getPass()) { isOwner = true; route(); } paintNav(); });
 </script>
 <div id="braveGate" hidden style="position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:16px">
   <div class="card" style="max-width:420px;display:grid;gap:12px;text-align:center">
