@@ -152,7 +152,7 @@ const app = $("#app");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const dec = s => { try { s = s.replace(/-/g, "+").replace(/_/g, "/"); return JSON.parse(decodeURIComponent(escape(atob(s)))); } catch (e) { return null; } };
-let tt; const toast = m => { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2200); };
+let tt; const toast = (m, ms) => { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, ms || 2600); };
 
 /* Work out what kind of stream a link is */
 function cleanLink(raw) {
@@ -160,6 +160,8 @@ function cleanLink(raw) {
   const m = raw.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i); // pasted embed code
   if (m) raw = m[1].replace(/&amp;/g, "&");
   if (raw.startsWith("//")) raw = "https:" + raw;
+  /* links pasted without https:// (e.g. "twitch.tv/name" or "www.site.com/live") */
+  else if (raw && !/^[a-z][a-z0-9+.-]*:/i.test(raw) && /^[\w-]+(\.[\w-]+)+(:\d+)?(\/|$|\?)/.test(raw)) raw = "https://" + raw;
   return raw;
 }
 function parse(url) {
@@ -367,7 +369,7 @@ const roomLink = r => `${location.origin}${location.pathname}${roomHref(r)}`;
 
 /* ===== Owner login. Only a one-way hash of the login is stored here, never the password itself. ===== */
 const OWNER = { salt: "c96004f1e51c1de4a087b0c8027ee886", iter: 310000, hash: "6d35cfa95661d82aff1cde1915567dda969e7ede8034c25211af78ef26664f45" };
-const REPO = { owner: "RnR4ZOR", repo: "Couchside-994fb", branch: "gh-pages", path: "rooms.json" };
+const REPO = { owner: "RnR4ZOR", repo: "CouchBandit", branch: "gh-pages", path: "rooms.json" };
 const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
 const unhex = s => new Uint8Array(s.match(/../g).map(x => parseInt(x, 16)));
 let isOwner = false, ownerPass = "", ownerToken = "";
@@ -421,12 +423,14 @@ async function saveRooms(list, msg) {
   const hdr = { Authorization: "Bearer " + ownerToken, Accept: "application/vnd.github+json" };
   try {
     const cur = await fetch(api + "?ref=" + REPO.branch + "&t=" + Date.now(), { headers: hdr, cache: "no-store" });
-    if (cur.status === 401 || cur.status === 403) { ownerToken = ""; toast("The GitHub key didn't work. Enter it again."); return (await askToken()) ? saveRooms(list, msg) : false; }
+    if (cur.status === 401) { ownerToken = ""; toast("That GitHub key isn't valid or has expired. Paste a new one.", 6000); return (await askToken()) ? saveRooms(list, msg) : false; }
+    if (cur.status === 403) { ownerToken = ""; toast("Your GitHub key doesn't have access to CouchBandit. Make a key for that repo with Contents: Read and write.", 8000); return (await askToken()) ? saveRooms(list, msg) : false; }
     const sha = cur.ok ? (await cur.json()).sha : undefined;
     const body = JSON.stringify(list, null, 2);
     const content = btoa(unescape(encodeURIComponent(body)));
     const put = await fetch(api, { method: "PUT", headers: hdr, body: JSON.stringify({ message: msg || "Update rooms", content, sha, branch: REPO.branch }) });
-    if (!put.ok) { toast("Couldn't save (" + put.status + "). Try again."); return false; }
+    if (put.status === 401 || put.status === 403 || put.status === 404) { ownerToken = ""; toast("Your GitHub key can't save to CouchBandit. Make a key for that repo with Contents: Read and write.", 8000); return (await askToken()) ? saveRooms(list, msg) : false; }
+    if (!put.ok) { let why = ""; try { why = (await put.json()).message || ""; } catch (e) {} toast("Couldn't save (" + put.status + (why ? ": " + why : "") + "). Try again.", 7000); return false; }
     ROOMS = list; toast("Saved. Live for everyone in about a minute"); return true;
   } catch (e) { toast("Couldn't reach GitHub. Check your connection."); return false; }
 }
@@ -530,7 +534,7 @@ async function submitRoom(form, old) {
   const items = readStreams(form).filter(it => it.url);
   if (!items.length) { toast("Add at least one main link"); return; }
   const bad = items.flatMap(sourcesOf).find(u => parse(u).kind === "bad");
-  if (bad) { toast("Fix this link first: " + bad.slice(0, 40)); return; }
+  if (bad) { toast("This link isn't valid, check it and try again: " + bad.slice(0, 50), 6000); return; }
   const sb = form.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Saving…";
   await verifyItems(items, false);
   const nr = { id: old.id || newId(), created: old.created || Date.now(), featured: !!old.featured, name: $("#ed_name").value.trim() || "Room", topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
