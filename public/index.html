@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Couchside</title>
-<meta name="description" content="Make a room, drop in a stream link, and send it to your mates.">
+<title>Couch Bandit</title>
+<meta name="description" content="Pick a room, hit play, watch with your mates.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700;800&display=swap">
 <style>
@@ -101,38 +101,57 @@ body.lockscroll{overflow:hidden}
 .count{font:400 32px var(--display);color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:700;z-index:20}
 footer{border-top:1px solid var(--line);padding-block:22px;color:var(--muted);font-size:13px}
+.modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:16px}
+.modal .card{width:100%;max-width:400px}
+.hero.solo{grid-template-columns:1fr}
+.roomwrap .star{position:absolute;left:8px;top:8px;z-index:2;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:999px;width:30px;height:30px;cursor:pointer;font-size:16px;display:grid;place-items:center}
+.roomwrap .star.on{color:var(--accent)}
+span.star{pointer-events:none}
+.roomwrap .rm~a .src{left:46px}
+.switcher{display:flex;gap:8px;align-items:center;margin:4px 0 2px}
+.swrooms{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;padding-bottom:4px;scrollbar-width:thin}
+.switcher .chip{text-decoration:none;white-space:nowrap;flex:none}
+.switcher .chip[aria-current="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.bklist{display:grid;gap:8px}
+.bklist .lbl{font-size:13px;font-weight:700;color:var(--muted)}
+.bk{display:flex;gap:8px}.bk input{flex:1;min-width:0}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <header><div class="wrap nav">
-  <a class="logo" href="#/"><b></b>Couchside</a>
+  <a class="logo" href="#/"><b></b>Couch Bandit</a>
   <a class="l" href="#/">Rooms</a>
-  <a class="l" href="#/new">New room</a>
+  <a class="l" href="#/new" id="addNav" hidden>Add room</a>
+  <button type="button" class="btn alt sm" id="ownerBtn">Owner login</button>
 </div></header>
 
 <main class="wrap" id="app"></main>
 
-<footer><div class="wrap">Couchside · Watch together. Only share streams you have the right to share.</div></footer>
+<footer><div class="wrap">Couch Bandit · Watch together. No accounts, no tracking. Only share streams you have the right to share.</div></footer>
+<div class="modal" id="loginBox" hidden><form class="card" id="loginForm" autocomplete="off">
+  <h2>Owner login</h2>
+  <label>Username<input id="lg_user" required autocapitalize="off" spellcheck="false"></label>
+  <label>Password<input id="lg_pass" type="password" required></label>
+  <p class="note" id="lg_msg" role="status"></p>
+  <div style="display:flex;gap:8px"><button class="btn" id="lg_go" type="submit">Log in</button><button type="button" class="btn alt" id="lg_cancel">Cancel</button></div>
+</form></div>
+<div class="modal" id="tokenBox" hidden><form class="card" id="tokenForm" autocomplete="off">
+  <h2>Connect GitHub (one time)</h2>
+  <p class="note">Saving rooms for everyone needs your GitHub key. It's locked with your owner password and kept only on this device.</p>
+  <label>GitHub key<input id="tk_val" type="password" required placeholder="github_pat_..."></label>
+  <div style="display:flex;gap:8px"><button class="btn" type="submit">Save key</button><button type="button" class="btn alt" id="tk_cancel">Cancel</button></div>
+</form></div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
-/* ===== Featured rooms: edit this list to pin rooms for everyone who visits ===== */
-const FEATURED = [
-  { name: "Lofi study room", host: "Couchside", topic: "Chill beats while you work", items: [{ title: "Lofi radio", url: "https://www.youtube.com/watch?v=jfKfPfyJRdk" }] },
-  { name: "Space station cams", host: "Couchside", topic: "Earth from orbit", items: [{ title: "ISS live view", url: "https://www.youtube.com/watch?v=xRPjKQtRXR8" }] }
-];
-/* ============================================================================ */
 
 const $ = s => document.querySelector(s);
 const app = $("#app");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const dec = s => { try { s = s.replace(/-/g, "+").replace(/_/g, "/"); return JSON.parse(decodeURIComponent(escape(atob(s)))); } catch (e) { return null; } };
-const store = { get() { try { return (JSON.parse(localStorage.getItem("couchside-rooms")) || []).filter(r => !expired(r)); } catch (e) { return []; } },
-  set(v) { try { localStorage.setItem("couchside-rooms", JSON.stringify(v)); } catch (e) {} } };
-const roomLink = r => `${location.origin}${location.pathname}#/room/${enc(r)}`;
 let tt; const toast = m => { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2200); };
 
 /* Work out what kind of stream a link is */
@@ -233,7 +252,7 @@ async function mountVideo(layer, p, onFail, viaRelay) {
     if (!viaRelay && canRelay && layer.isConnected) {
       /* fresh <video> so no old listeners or engine state carry over */
       const nv = v.cloneNode(false); v.replaceWith(nv);
-      say("Retrying through the Couchside relay…");
+      say("Retrying through the relay…");
       return mountVideo(layer, p, onFail, true);
     }
     say(""); onFail && onFail();
@@ -331,108 +350,207 @@ function startLabel(start) {
   if (t <= now) return "Started";
   return t.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
-function roomCard(r, mine) {
-  const p = parse(r.items[0].url);
-  return `<div class="roomwrap">${r.id && mine ? `<button type="button" class="rm" data-rm="${esc(keyOf(r))}" aria-label="Delete room">✕</button>` : ""}<a class="room" href="#/room/${enc(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${esc(p.label || "Stream")}</span>${initials(r.name)}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
-    <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " video" : " videos")))} · by ${esc(r.host || "you")}</span></div></a></div>`;
+const newId = () => Math.random().toString(36).slice(2, 10).padEnd(8, "0");
+const HOUR = 3600e3;
+const expired = () => false;
+
+/* ===== Room list: lives in rooms.json next to this page. Everyone reads it; only the owner can change it. ===== */
+let ROOMS = [];
+async function loadRooms() {
+  try { const res = await fetch("rooms.json?v=" + Date.now(), { cache: "no-store" }); if (res.ok) { const j = await res.json(); ROOMS = Array.isArray(j) ? j.filter(r => r && r.id && Array.isArray(r.items) && r.items.length) : []; } }
+  catch (e) {}
+  return ROOMS;
 }
+const byId = id => ROOMS.find(r => r.id === id);
+const roomHref = r => r.id && byId(r.id) ? `#/r/${encodeURIComponent(r.id)}` : `#/room/${enc(r)}`;
+const roomLink = r => `${location.origin}${location.pathname}${roomHref(r)}`;
+
+/* ===== Owner login. Only a one-way hash of the login is stored here, never the password itself. ===== */
+const OWNER = { salt: "c96004f1e51c1de4a087b0c8027ee886", iter: 310000, hash: "6d35cfa95661d82aff1cde1915567dda969e7ede8034c25211af78ef26664f45" };
+const REPO = { owner: "RnR4ZOR", repo: "Couchside-994fb", branch: "gh-pages", path: "rooms.json" };
+const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+const unhex = s => new Uint8Array(s.match(/../g).map(x => parseInt(x, 16)));
+let isOwner = false, ownerPass = "", ownerToken = "";
+async function pbkdf2(secret, saltHex, iter, bits = 256) {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), "PBKDF2", false, ["deriveBits"]);
+  return crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: unhex(saltHex), iterations: iter }, k, bits);
+}
+/* The GitHub key that saves room changes is kept only on the owner's device, locked with the owner password */
+async function aesKey(pass, saltHex) { const bits = await pbkdf2("token:" + pass, saltHex, OWNER.iter); return crypto.subtle.importKey("raw", bits, "AES-GCM", false, ["encrypt", "decrypt"]); }
+async function lockToken(tok) {
+  const salt = hex(crypto.getRandomValues(new Uint8Array(16))), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await aesKey(ownerPass, salt), new TextEncoder().encode(tok));
+  try { localStorage.setItem("cb-owner-key", JSON.stringify({ salt, iv: hex(iv), ct: hex(ct) })); } catch (e) {}
+}
+async function unlockToken() {
+  try { const s = JSON.parse(localStorage.getItem("cb-owner-key")); if (!s) return "";
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unhex(s.iv) }, await aesKey(ownerPass, s.salt), unhex(s.ct));
+    return new TextDecoder().decode(pt); } catch (e) { return ""; }
+}
+async function login(user, pass) {
+  const h = hex(await pbkdf2(user + ":" + pass, OWNER.salt, OWNER.iter));
+  if (h !== OWNER.hash) return false;
+  isOwner = true; ownerPass = pass; ownerToken = await unlockToken();
+  try { sessionStorage.setItem("cb-owner", "1"); } catch (e) {}
+  return true;
+}
+function logout() { isOwner = false; ownerPass = ""; ownerToken = ""; try { sessionStorage.removeItem("cb-owner"); } catch (e) {} paintNav(); route(); toast("Logged out"); }
+function paintNav() {
+  $("#ownerBtn").textContent = isOwner ? "Log out" : "Owner login";
+  $("#addNav").hidden = !isOwner;
+}
+function showLogin() {
+  const d = $("#loginBox"); d.hidden = false; $("#lg_user").value = ""; $("#lg_pass").value = ""; $("#lg_msg").textContent = ""; $("#lg_user").focus();
+}
+$("#ownerBtn").onclick = () => isOwner ? logout() : showLogin();
+$("#lg_cancel").onclick = () => $("#loginBox").hidden = true;
+$("#loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const b = $("#lg_go"); b.disabled = true; $("#lg_msg").textContent = "Checking…";
+  const ok = await login($("#lg_user").value.trim(), $("#lg_pass").value);
+  b.disabled = false;
+  if (!ok) { $("#lg_msg").textContent = "That username or password isn't right."; return; }
+  $("#loginBox").hidden = true; paintNav(); route(); toast("Logged in as owner");
+});
+
+/* Save the room list for everyone: writes rooms.json to the site through GitHub. Live for everyone in about a minute. */
+async function saveRooms(list, msg) {
+  if (!isOwner) { toast("Only the owner can change rooms"); return false; }
+  if (!ownerToken && !(await askToken())) return false;
+  const api = `https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/${REPO.path}`;
+  const hdr = { Authorization: "Bearer " + ownerToken, Accept: "application/vnd.github+json" };
+  try {
+    const cur = await fetch(api + "?ref=" + REPO.branch + "&t=" + Date.now(), { headers: hdr, cache: "no-store" });
+    if (cur.status === 401 || cur.status === 403) { ownerToken = ""; toast("The GitHub key didn't work. Enter it again."); return (await askToken()) ? saveRooms(list, msg) : false; }
+    const sha = cur.ok ? (await cur.json()).sha : undefined;
+    const body = JSON.stringify(list, null, 2);
+    const content = btoa(unescape(encodeURIComponent(body)));
+    const put = await fetch(api, { method: "PUT", headers: hdr, body: JSON.stringify({ message: msg || "Update rooms", content, sha, branch: REPO.branch }) });
+    if (!put.ok) { toast("Couldn't save (" + put.status + "). Try again."); return false; }
+    ROOMS = list; toast("Saved. Live for everyone in about a minute"); return true;
+  } catch (e) { toast("Couldn't reach GitHub. Check your connection."); return false; }
+}
+function askToken() {
+  return new Promise(done => {
+    const d = $("#tokenBox"); d.hidden = false; $("#tk_val").value = ""; $("#tk_val").focus();
+    $("#tk_cancel").onclick = () => { d.hidden = true; done(false); };
+    $("#tokenForm").onsubmit = async e => {
+      e.preventDefault(); const v = $("#tk_val").value.trim(); if (!v) return;
+      ownerToken = v; await lockToken(v); d.hidden = true; done(true);
+    };
+  });
+}
+
+function roomCard(r) {
+  const p = parse(r.items[0].url);
+  const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Remove room">✕</button><button type="button" class="star${r.featured ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}" aria-label="${r.featured ? "Remove from featured" : "Add to featured"}">${r.featured ? "★" : "☆"}</button>` : (r.featured ? `<span class="star on" aria-hidden="true">★</span>` : "");
+  return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${esc(p.label || "Stream")}</span>${initials(r.name)}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
+    <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " stream" : " streams")))}</span></div></a></div>`;
+}
+/* Owner only: star a room to pin it in Featured on the home page */
+async function toggleStar(id) {
+  if (!isOwner) return false;
+  await loadRooms(); const r = byId(id); if (!r) return false;
+  const on = !r.featured;
+  return saveRooms(ROOMS.map(x => x.id === id ? { ...x, featured: on } : x), (on ? "Feature room: " : "Unfeature room: ") + r.name);
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-star]"); if (!b) return;
+  e.preventDefault(); b.disabled = true;
+  if (await toggleStar(b.dataset.star)) route(); else b.disabled = false;
+});
 
 /* ===== Pages ===== */
 function home() {
-  const mine = store.get();
   app.innerHTML = `
-  <section class="hero">
-    <div style="display:grid;gap:16px;align-content:start">
-      <h1>Make a room. Drop a stream. <em>Send the link.</em></h1>
-      <p class="sub">Paste a YouTube, Twitch, Kick or Vimeo link, or a direct .m3u8 or .mp4 stream. Couchside turns it into a room your mates can open on any phone or laptop, no sign-up needed.</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="#/new">Create a room</a><a class="btn alt" href="#rooms">Browse rooms</a></div>
+  <section class="hero solo">
+    <div style="display:grid;gap:14px;align-content:start">
+      <h1>Pull up a couch. <em>Pick a room.</em></h1>
+      <p class="sub">Open any room below and hit play. If a stream drops, tap a backup to switch. No sign-up needed.</p>
+      ${isOwner ? `<div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="#/new">Add a room</a></div>` : ""}
     </div>
-    ${quickForm()}
+  </section>
+  <section id="featured" hidden>
+    <div class="secthead"><h2>Featured rooms</h2><span class="note">Picked by the owner</span></div>
+    <div id="featList"></div>
   </section>
   <section id="rooms">
-    <div class="secthead"><h2>Your rooms</h2>${mine.length ? `<button class="btn alt sm" id="clearMine">Clear list</button>` : ""}</div>
-    ${mine.length ? `<div class="rooms">${mine.map(r => roomCard(r, true)).join("")}</div>` : `<div class="empty">Rooms you create show up here. They delete themselves 48 hours after the event.</div>`}
-  </section>
-  <section>
-    <div class="secthead"><h2>Open rooms</h2><span class="note">Everyone's rooms, open to anyone with the link</span></div>
-    <div id="openRooms"><div class="empty">Loading rooms…</div></div>
-  </section>
-  <section>
-    <div class="secthead"><h2>Featured rooms</h2><span class="note">Open to everyone who visits</span></div>
-    <div class="rooms">${FEATURED.map(roomCard).join("")}</div>
+    <div class="secthead"><h2>All rooms</h2>${isOwner ? `<span class="note">You're the owner: ☆ features a room, ✕ removes it for everyone</span>` : ""}</div>
+    <div id="roomList"><div class="empty">Loading rooms…</div></div>
   </section>`;
-  bindQuick();
-  const c = $("#clearMine"); if (c) c.onclick = () => { if (!confirm("Remove all rooms from this list? Saved rooms are deleted for good.")) return; store.get().forEach(x => x.id && cloudDelete(x.id)); store.set([]); home(); toast("List cleared"); };
-  /* publish older rooms on this device that were never saved to the server */
-  const local = store.get(); let changed = false;
-  local.forEach(r => { if (!r.id) { r.id = newId(); r.created = r.created || Date.now(); changed = true; cloudSave(r); } });
-  if (changed) store.set(local);
-  cloudList().then(list => {
-    const box = $("#openRooms"); if (!box) return;
-    const rooms = (list || []).filter(r => !expired(r)), mineIds = new Set(store.get().map(x => x.id).filter(Boolean));
-    box.innerHTML = rooms.length ? `<div class="rooms">${rooms.map(r => roomCard(r, mineIds.has(r.id))).join("")}</div>` : `<div class="empty">${list ? "No rooms open right now. Make one above." : "Couldn't load rooms. Refresh to try again."}</div>`;
-  });
+  const paint = () => { const box = $("#roomList"); if (!box) return;
+    const feat = ROOMS.filter(r => r.featured); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
+    box.innerHTML = ROOMS.length ? `<div class="rooms">${ROOMS.map(roomCard).join("")}</div>` : `<div class="empty">No rooms yet.${isOwner ? " Add one above." : " Check back soon."}</div>`; };
+  paint(); loadRooms().then(paint);
 }
-document.addEventListener("click", e => homeClicks(e));
-function homeClicks(e) {
+document.addEventListener("click", async e => {
   const b = e.target.closest("[data-rm]"); if (!b) return;
-  e.preventDefault(); if (!confirm("Delete this room?")) return;
-  const k = b.dataset.rm; forget(k); cloudDelete(k); home(); toast("Room deleted");
-}
-function quickForm(full) {
-  return `<form class="card" id="qf">
-    <h2>${full ? "Set up your room" : "Quick room"}</h2>
-    <label>Room name<input id="q_name" required maxlength="60" placeholder="Friday fight night"></label>
-    <label>Stream link or embed code<input id="q_url" required placeholder="https://www.twitch.tv/yourchannel"></label>
-    ${full ? `
-    <div class="two"><label>Your name<input id="q_host" maxlength="40" placeholder="Mark"></label>
-    <label>Starts at (optional)<input id="q_start" type="datetime-local"></label></div>
-    <label>What's on<input id="q_topic" maxlength="80" placeholder="Main card, pre-show chat from 7"></label>
-    <label>Backup links for the main stream (optional, one per line)<textarea id="q_backups" placeholder="If the main link drops, the room switches to these"></textarea></label>
-    <label>Up next (optional, one link per line)<textarea id="q_more" placeholder="https://youtu.be/...&#10;https://youtu.be/..."></textarea></label>` : ""}
-    <p class="note" id="q_detect">Paste a link or embed code and I'll check it.</p>
-    <button class="btn" type="submit">Create room</button>
-  </form>`;
-}
-function bindQuick() {
-  const f = $("#qf"); if (!f) return;
-  $("#q_url").addEventListener("input", e => {
-    const p = parse(e.target.value);
-    $("#q_detect").textContent = !e.target.value ? "Paste a link or embed code and I'll check it." : p.kind === "bad" ? "That isn't a full link yet. It should start with https://" : p.kind === "nobrowser" ? `${p.label}: web browsers can't play this type. Use an HLS (.m3u8) link if you can.` : p.kind === "embed" ? `Web page from ${p.label}. I'll pull the video out of it when you create the room.` : `Looks good: ${p.label}${p.channel ? " channel " + p.channel : ""}.`;
-  });
-  f.addEventListener("submit", async e => {
-    e.preventDefault();
-    const sb = f.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Checking links…";
-    const bk = $("#q_backups");
-    const items = [{ title: "Main stream", url: cleanLink($("#q_url").value), backups: bk ? bk.value.split(/\n+/).map(cleanLink).filter(Boolean) : [] }];
-    const more = $("#q_more"); if (more) more.value.split(/\n+/).map(s => s.trim()).filter(Boolean).forEach((u, i) => items.push({ title: "Up next " + (i + 1), url: cleanLink(u), backups: [] }));
-    const r = { name: $("#q_name").value.trim(), host: ($("#q_host") || {}).value?.trim() || "", topic: ($("#q_topic") || {}).value?.trim() || "", start: ($("#q_start") || {}).value || "", items };
-    await verifyItems(r.items, true);
-    sb.disabled = false;
-    r.id = newId(); r.created = Date.now(); remember(r); cloudSave(r).then(ok => toast(ok ? "Room saved" : "Saved on this device")); location.hash = "#/room/" + enc(r);
+  e.preventDefault(); if (!isOwner) return;
+  const r = byId(b.dataset.rm); if (!r || !confirm(`Remove "${r.name}" for everyone?`)) return;
+  if (await saveRooms(ROOMS.filter(x => x.id !== r.id), "Remove room: " + r.name)) home();
+});
+
+/* ===== Stream editor: each stream has a main link plus any number of backup links ===== */
+const backupInput = (u, k) => `<div class="bk" data-bk><input data-f="backup" value="${esc(u || "")}" placeholder="Backup ${k + 1} link"><button type="button" class="btn alt sm" data-bkdel aria-label="Remove backup">✕</button></div>`;
+const streamRow = (it, j) => `<div class="editrow" data-row>
+    <div class="editrowhead"><b>Stream ${j + 1}</b><span style="display:flex;gap:6px"><button type="button" class="btn alt sm" data-up>↑</button><button type="button" class="btn alt sm" data-down>↓</button><button type="button" class="btn alt sm" data-del>Remove</button></span></div>
+    <div class="two"><label>Title<input data-f="title" maxlength="60" value="${esc(it.title || "")}" placeholder="Main card"></label><label>Main link<input data-f="url" value="${esc(it.url || "")}" placeholder="https://"></label></div>
+    <div class="bklist"><span class="lbl">Backup links</span><div data-bks style="display:grid;gap:8px">${(it.backups || []).map(backupInput).join("")}</div><button type="button" class="btn alt sm" data-bkadd style="justify-self:start">+ Add backup</button></div>
+  </div>`;
+const readStreams = box => [...box.querySelectorAll("[data-row]")].map((row, j) => ({
+  title: row.querySelector('[data-f="title"]').value.trim() || "Stream " + (j + 1),
+  url: cleanLink(row.querySelector('[data-f="url"]').value),
+  backups: [...row.querySelectorAll('[data-f="backup"]')].map(i => cleanLink(i.value)).filter(Boolean)
+}));
+function bindStreams(box) {
+  const rows = box.querySelector("[data-rows]");
+  box.addEventListener("click", e => {
+    const t = e.target, row = t.closest("[data-row]");
+    if (t.hasAttribute("data-bkadd")) { const l = row.querySelector("[data-bks]"); l.insertAdjacentHTML("beforeend", backupInput("", l.children.length)); l.lastElementChild.querySelector("input").focus(); return; }
+    if (t.hasAttribute("data-bkdel")) { t.closest("[data-bk]").remove(); return; }
+    if (t.hasAttribute("data-addstream")) { rows.insertAdjacentHTML("beforeend", streamRow({}, rows.children.length)); return; }
+    if (!row) return;
+    const items = readStreams(box), j = [...rows.children].indexOf(row);
+    if (t.hasAttribute("data-del")) { if (items.length === 1) { toast("A room needs at least one stream"); return; } items.splice(j, 1); }
+    else if (t.hasAttribute("data-up") && j > 0) [items[j - 1], items[j]] = [items[j], items[j - 1]];
+    else if (t.hasAttribute("data-down") && j < items.length - 1) [items[j + 1], items[j]] = [items[j], items[j + 1]];
+    else return;
+    rows.innerHTML = items.map(streamRow).join("");
   });
 }
-const keyOf = r => r.id || enc(r);
-/* Rooms delete themselves 48 hours after the event is over (event = start time + 6 hours).
-   Rooms with no start time go 48 hours after they were made. */
-const HOUR = 3600e3;
-const expiresAt = r => r.start && !isNaN(new Date(r.start)) ? new Date(r.start).getTime() + 54 * HOUR : r.created ? r.created + 48 * HOUR : Infinity;
-const expired = r => Date.now() > expiresAt(r);
-function remember(r) { const k = keyOf(r); const list = store.get().filter(x => keyOf(x) !== k); list.unshift(r); store.set(list.slice(0, 50)); }
-/* ===== Saved rooms: kept on this device and on the server, so they survive reloads, cleared data and other devices ===== */
-try { navigator.storage?.persist?.(); } catch (e) {}
-const newId = () => Math.random().toString(36).slice(2, 10).padEnd(8, "0");
-const API = "/api/rooms";
-async function cloudSave(r) { try { const res = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ room: r }) }); return res.ok; } catch (e) { return false; } }
-async function cloudList() { try { const res = await fetch(API, { cache: "no-store" }); return res.ok ? await res.json() : null; } catch (e) { return null; } }
-async function cloudDelete(id) { try { await fetch(API + "?id=" + encodeURIComponent(id), { method: "DELETE" }); } catch (e) {} }
-function forget(k) { store.set(store.get().filter(x => keyOf(x) !== k)); }
-function newRoom() { app.innerHTML = `<section style="max-width:640px;width:100%;margin:0 auto;display:grid;gap:16px"><a href="#/" class="note">← All rooms</a>${quickForm(true)}<p class="note">Everything about the room lives in its link, so anyone you send it to sees the same stream and line-up.</p></section>`; bindQuick(); }
+function roomForm(r, title) {
+  return `<div class="secthead" style="margin:0"><h2>${title}</h2>${r.id ? `<button type="button" class="btn alt sm" id="edClose">Close</button>` : ""}</div>
+    <label>Room name<input id="ed_name" required maxlength="60" value="${esc(r.name || "")}" placeholder="Friday fight night"></label>
+    <div class="two"><label>What's on<input id="ed_topic" maxlength="80" value="${esc(r.topic || "")}" placeholder="Main card from 12"></label><label>Starts at (optional)<input id="ed_start" type="datetime-local" value="${esc(r.start || "")}"></label></div>
+    <div data-rows style="display:grid;gap:12px">${(r.items && r.items.length ? r.items : [{}]).map(streamRow).join("")}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt" data-addstream>+ Add stream</button><button class="btn" type="submit">Save room</button></div>
+    <p class="note">Rooms are saved for everyone. Only you can add, change or remove them.</p>`;
+}
+async function submitRoom(form, old) {
+  const items = readStreams(form).filter(it => it.url);
+  if (!items.length) { toast("Add at least one main link"); return; }
+  const bad = items.flatMap(sourcesOf).find(u => parse(u).kind === "bad");
+  if (bad) { toast("Fix this link first: " + bad.slice(0, 40)); return; }
+  const sb = form.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Saving…";
+  await verifyItems(items, false);
+  const nr = { id: old.id || newId(), created: old.created || Date.now(), featured: !!old.featured, name: $("#ed_name").value.trim() || "Room", topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
+  await loadRooms();
+  const list = old.id ? ROOMS.map(x => x.id === old.id ? nr : x) : [...ROOMS, nr];
+  if (old.id && !byId(old.id)) list.push(nr);
+  const ok = await saveRooms(list, (old.id ? "Update room: " : "Add room: ") + nr.name);
+  sb.disabled = false; sb.textContent = "Save room";
+  if (ok) location.hash = "#/r/" + encodeURIComponent(nr.id);
+}
+function newRoom() {
+  if (!isOwner) { app.innerHTML = `<div class="empty">Only the owner can add rooms.<br><br><a class="btn" href="#/">Back to rooms</a></div>`; return; }
+  app.innerHTML = `<section style="max-width:720px;width:100%;margin:0 auto;display:grid;gap:16px"><a href="#/" class="note">← All rooms</a><form class="card" id="newForm">${roomForm({}, "Add a room")}</form></section>`;
+  const f = $("#newForm"); bindStreams(f); f.addEventListener("submit", e => { e.preventDefault(); submitRoom(f, {}); });
+}
 let timer;
 /* ===== Full screen: real full screen where the browser allows it,
    otherwise (iPhone) the player fills the whole screen inside the page ===== */
 let wantFull = false;
-document.addEventListener("click", e => { if (e.target.closest('a[href^="#/room/"]')) wantFull = true; }, true);
+document.addEventListener("click", e => { if (e.target.closest('a[href^="#/room/"],a[href^="#/r/"]')) wantFull = true; }, true);
 function goFull() {
   const el = $("#player"); if (!el) return;
   $("#tapFs")?.remove();
@@ -453,16 +571,26 @@ function exitFull() {
 addEventListener("keydown", e => { if (e.key === "Escape") exitFull(); });
 addEventListener("hashchange", () => document.body.classList.remove("lockscroll"));
 
-function room(path) {
-  const [code, si, ss] = path.split("/");
-  const r = dec(code);
-  if (!r || !Array.isArray(r.items) || !r.items.length) { app.innerHTML = `<div class="empty">This room link is broken or incomplete. Ask whoever sent it to copy it again.<br><br><a class="btn" href="#/">Back to rooms</a></div>`; return; }
-  remember(r);
+/* Room switcher: buttons for every room, plus previous / next */
+function switcherHTML(r) {
+  if (!ROOMS.length) return "";
+  const i = ROOMS.findIndex(x => x.id === r.id);
+  const prev = ROOMS[(i < 0 ? 0 : i - 1 + ROOMS.length) % ROOMS.length], next = ROOMS[(i + 1) % ROOMS.length];
+  return `<nav class="switcher" aria-label="Switch room">
+    ${ROOMS.length > 1 ? `<a class="chip nav" href="${roomHref(prev)}" aria-label="Previous room">‹ Prev</a>` : ""}
+    <div class="swrooms">${ROOMS.map(x => `<a class="chip" href="${roomHref(x)}" aria-current="${x.id === r.id}">${esc(x.name)}</a>`).join("")}</div>
+    ${ROOMS.length > 1 ? `<a class="chip nav" href="${roomHref(next)}" aria-label="Next room">Next ›</a>` : ""}
+  </nav>`;
+}
+
+function room(r, si, ss) {
+  if (!r || !Array.isArray(r.items) || !r.items.length) { app.innerHTML = `<div class="empty">This room isn't available. It may have been removed.<br><br><a class="btn" href="#/">Back to rooms</a></div>`; return; }
   let idx = 0, src = 0; const link = roomLink(r);
   app.innerHTML = `
   <a href="#/" class="note">← All rooms</a>
-  <div class="roomhead"><div style="display:grid;gap:4px"><span class="live" id="liveTag">Room open</span><h1 style="font-size:clamp(26px,4vw,40px)">${esc(r.name)}</h1><span class="note">${esc(r.topic || "")}${r.host ? (r.topic ? " · " : "") + "Hosted by " + esc(r.host) : ""}</span></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
+  <div id="switcher">${switcherHTML(r)}</div>
+  <div class="roomhead"><div style="display:grid;gap:4px"><span class="live" id="liveTag">Room open</span><h1 style="font-size:clamp(26px,4vw,40px)">${esc(r.name)}</h1><span class="note">${esc(r.topic || "")}</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button>${isOwner && r.id ? `<button class="btn alt" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}">${r.featured ? "★ Featured" : "☆ Feature"}</button><button class="btn alt" id="editBtn">Edit room</button>` : ""}<button class="btn alt" id="fsBtn">Full screen</button></div></div>
   <div class="stage">
     <div style="display:grid;gap:12px;min-width:0">
       <div class="player" id="player"><button type="button" class="tapfs" id="tapFs">▶ Tap to watch full screen</button><button type="button" class="exitfs" id="exitFs">✕ Exit full screen</button></div>
@@ -472,25 +600,25 @@ function room(path) {
     </div>
     <aside class="side">
       <div class="card"><h3>Invite your mates</h3><div class="sharebox"><input id="shareLink" readonly value="${esc(link)}" aria-label="Room link"><button class="btn sm" id="copyBtn">Copy</button></div><span class="note">Anyone with this link can join. No account needed.</span></div>
-      <div class="card"><h3>Line-up</h3><ul class="queue" id="queue"></ul></div>
+      <div class="card"><h3>Streams</h3><ul class="queue" id="queue"></ul></div>
       <div class="card" id="chatCard" hidden><h3>Chat</h3><iframe class="chatframe" id="chat" sandbox="allow-scripts allow-same-origin allow-forms" title="Stream chat"></iframe></div>
     </aside>
   </div>`;
+  if (!ROOMS.length) loadRooms().then(() => { const s = $("#switcher"); if (s) s.innerHTML = switcherHTML(r); });
+  const base = location.hash.split("/").slice(0, 3).join("/");
 
   /* Universal player: one frame. Picking a source reloads the player with only that source. */
   function show(i, s, quiet) {
-    const srcs = sourcesOf(r.items[i]);
     idx = Math.min(Math.max(0, i), r.items.length - 1); src = Math.min(Math.max(0, s), sourcesOf(r.items[idx]).length - 1);
     const p = parse(sourcesOf(r.items[idx])[src]);
     const old = $("#player").querySelector(".layer"); old?._destroy?.();
     $("#player").querySelectorAll(".layer").forEach(l => l.remove());
     $("#player").insertAdjacentHTML("afterbegin", `<div class="layer on">${playerHTML(p)}</div>`);
     const layer = $("#player").querySelector(".layer");
-    mountVideo(layer, p, () => { const n = sourcesOf(r.items[idx]).length; if (src + 1 < n) { toast("Stream dropped. Loading backup " + (src + 1)); show(idx, src + 1); } else { toast("None of the links played. Add a working backup in Edit room."); } });
-    history.replaceState(null, "", `#/room/${code}/${idx}/${src}`);
+    mountVideo(layer, p, () => { const n = sourcesOf(r.items[idx]).length; if (src + 1 < n) { toast("Stream dropped. Loading backup " + (src + 1)); show(idx, src + 1); } else { toast("None of the links played. Try another stream."); } });
+    history.replaceState(null, "", `${base}/${idx}/${src}`);
     const list = sourcesOf(r.items[idx]);
-    /* check every source for this video in the background and colour its dot */
-    list.forEach(u => checkLink(u).then(c => { document.querySelectorAll(`[data-dot="${CSS.escape(u)}"]`).forEach(d => { d.className = "dot " + (c ? (c.ok ? (c.status === "live-only" ? "maybe" : "ok") : "no") : ""); d.title = c ? c.note : "Checker not running here"; }); }));
+    list.forEach(u => checkLink(u).then(c => { document.querySelectorAll(`[data-dot="${CSS.escape(u)}"]`).forEach(d => { d.className = "dot " + (c ? (c.ok ? (c.status === "live-only" ? "maybe" : "ok") : "no") : ""); d.title = c ? c.note : ""; }); }));
     $("#srcbar").innerHTML = `<span class="note">Now playing</span>` + list.map((u, j) => { const q = parse(u); return `<button type="button" class="chip" data-s="${j}" aria-pressed="${j === src}"><span><i class="dot" data-dot="${esc(u)}"></i>${j === 0 ? "Main" : "Backup " + j}</span><small>${esc(q.label || "Link")}</small></button>`; }).join("") + `<button type="button" class="chip" data-reload>Reload<small>same source</small></button>`;
     $("#queue").innerHTML = r.items.map((it, j) => { const q = parse(it.url); const nb = (it.backups || []).length; return `<li><button data-i="${j}" aria-current="${j === idx}"><b>${esc(it.title)}</b><small>${esc(q.label || "Link")}${q.channel ? " · " + esc(q.channel) : ""}${nb ? " · " + nb + (nb === 1 ? " backup" : " backups") : ""}</small></button></li>`; }).join("");
     const chat = p.kind === "twitch" && p.channel ? `https://www.twitch.tv/embed/${encodeURIComponent(p.channel)}/chat?parent=${encodeURIComponent(host)}&darkpopout` : p.kind === "kick" ? `https://kick.com/popout/${encodeURIComponent(p.channel)}/chat` : "";
@@ -503,68 +631,17 @@ function room(path) {
   $("#exitFs").onclick = () => exitFull();
   if (wantFull) { wantFull = false; goFull(); }
   $("#copyBtn").onclick = () => { const sel = () => { $("#shareLink").select(); toast("Link selected, copy it"); }; navigator.clipboard ? navigator.clipboard.writeText(link).then(() => toast("Link copied"), sel) : sel(); };
-  $("#shareBtn").onclick = async () => { if (navigator.share) { try { await navigator.share({ title: r.name, text: `Join my room on Couchside: ${r.name}`, url: link }); } catch (e) {} } else $("#copyBtn").click(); };
+  $("#shareBtn").onclick = async () => { if (navigator.share) { try { await navigator.share({ title: r.name, text: `Join me on Couch Bandit: ${r.name}`, url: link }); } catch (e) {} } else $("#copyBtn").click(); };
   $("#fsBtn").onclick = () => goFull();
 
-  /* ===== Edit room: rename, change links, add or remove backups and videos ===== */
+  /* Owner only: edit the room's streams and backups */
   const ed = $("#editor");
-  const rowHTML = (it, j) => `<div class="editrow" data-row>
-      <div class="editrowhead"><b>Video ${j + 1}</b><span style="display:flex;gap:6px"><button type="button" class="btn alt sm" data-up>↑</button><button type="button" class="btn alt sm" data-down>↓</button><button type="button" class="btn alt sm" data-del>Remove</button></span></div>
-      <div class="two"><label>Title<input data-f="title" maxlength="60" value="${esc(it.title || "")}"></label><label>Main link<input data-f="url" required value="${esc(it.url || "")}" placeholder="https://"></label></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="btn alt sm" data-check>Check links</button><span class="note" data-report></span></div>
-      <label>Backup links (one per line)<textarea data-f="backups" placeholder="https://...">${esc((it.backups || []).join("\n"))}</textarea></label>
-    </div>`;
-  const renderEditor = items => {
-    ed.innerHTML = `<div class="secthead" style="margin:0"><h2>Edit room</h2><button type="button" class="btn alt sm" id="edClose">Close</button></div>
-      <div class="two"><label>Room name<input id="ed_name" required maxlength="60" value="${esc(r.name)}"></label><label>Your name<input id="ed_host" maxlength="40" value="${esc(r.host || "")}"></label></div>
-      <div class="two"><label>What's on<input id="ed_topic" maxlength="80" value="${esc(r.topic || "")}"></label><label>Starts at<input id="ed_start" type="datetime-local" value="${esc(r.start || "")}"></label></div>
-      <div id="edRows" style="display:grid;gap:12px">${items.map(rowHTML).join("")}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt" id="edAdd">Add video</button><button class="btn" type="submit">Save changes</button></div>
-      <p class="note">Saving gives the room a new link. Send the new link to your mates so they see the changes.</p>`;
-  };
-  const readRows = () => [...ed.querySelectorAll("[data-row]")].map((row, j) => ({ title: row.querySelector('[data-f="title"]').value.trim() || "Video " + (j + 1), url: cleanLink(row.querySelector('[data-f="url"]').value), backups: row.querySelector('[data-f="backups"]').value.split(/\n+/).map(cleanLink).filter(Boolean) }));
-  $("#editBtn").onclick = () => { if (ed.hidden) { renderEditor(r.items); ed.hidden = false; ed.scrollIntoView({ behavior: "smooth", block: "start" }); } else ed.hidden = true; };
-  ed.addEventListener("click", e => {
-    const t = e.target;
-    if (t.id === "edClose") { ed.hidden = true; return; }
-    const items = readRows(); const row = t.closest("[data-row]"); const j = row ? [...ed.querySelectorAll("[data-row]")].indexOf(row) : -1;
-    if (t.id === "edAdd") items.push({ title: "", url: "", backups: [] });
-    else if (t.hasAttribute("data-del")) { if (items.length === 1) { toast("A room needs at least one video"); return; } items.splice(j, 1); }
-    else if (t.hasAttribute("data-check")) {
-      const it = items[j]; if (!it.url) { toast("Add a main link first"); return; }
-      t.disabled = true; t.textContent = "Checking…";
-      const before = sourcesOf(it);
-      Promise.all(before.map(checkLink)).then(res => {
-        t.disabled = false; t.textContent = "Check links";
-        const rep = row.querySelector("[data-report]");
-        if (res.some(x => x === null)) { rep.textContent = "The checker runs once the site is on Cloudflare."; return; }
-        verifyItems([it]).then(() => {
-          row.querySelector('[data-f="url"]').value = it.url;
-          row.querySelector('[data-f="backups"]').value = it.backups.join("\n");
-          rep.innerHTML = res.map((c, k) => `<span title="${esc(c.note)}">${c.ok ? "✓" : "✗"} ${k === 0 ? "Main" : "Backup " + k}: ${esc(c.note)}</span>`).join("<br>");
-        });
-      });
-      return;
-    }
-    else if (t.hasAttribute("data-up") && j > 0) [items[j - 1], items[j]] = [items[j], items[j - 1]];
-    else if (t.hasAttribute("data-down") && j < items.length - 1) [items[j + 1], items[j]] = [items[j], items[j + 1]];
-    else return;
-    const keep = { name: $("#ed_name").value, host: $("#ed_host").value, topic: $("#ed_topic").value, start: $("#ed_start").value };
-    renderEditor(items); $("#ed_name").value = keep.name; $("#ed_host").value = keep.host; $("#ed_topic").value = keep.topic; $("#ed_start").value = keep.start;
-  });
-  ed.addEventListener("submit", async e => {
-    e.preventDefault();
-    const items = readRows().filter(it => it.url);
-    const sb = ed.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Checking links…";
-    await verifyItems(items, true);
-    sb.disabled = false; sb.textContent = "Save changes";
-    if (!items.length) { toast("Add at least one link"); return; }
-    const bad = items.flatMap(it => sourcesOf(it)).find(u => parse(u).kind === "bad");
-    if (bad) { toast("Fix this link first: " + bad.slice(0, 40)); return; }
-    const nr = { id: r.id || newId(), created: r.created || Date.now(), name: $("#ed_name").value.trim() || r.name, host: $("#ed_host").value.trim(), topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
-    forget(keyOf(r)); remember(nr); cloudSave(nr);
-    location.hash = "#/room/" + enc(nr); setTimeout(() => toast("Saved. Share the new link"), 50);
-  });
+  if ($("#editBtn")) {
+    bindStreams(ed);
+    $("#editBtn").onclick = () => { if (ed.hidden) { ed.innerHTML = roomForm(r, "Edit room"); ed.hidden = false; ed.scrollIntoView({ behavior: "smooth", block: "start" }); } else ed.hidden = true; };
+    ed.addEventListener("click", e => { if (e.target.id === "edClose") ed.hidden = true; });
+    ed.addEventListener("submit", e => { e.preventDefault(); submitRoom(ed, r); });
+  }
 
   show(+si || 0, +ss || 0, true);
   clearInterval(timer);
@@ -577,22 +654,27 @@ function room(path) {
   }
 }
 
-function route() {
+async function route() {
   clearInterval(timer);
   const h = location.hash || "#/";
-  if (h.startsWith("#/room/")) room(h.slice(7));
+  if (h.startsWith("#/r/")) {
+    const [id, si, ss] = h.slice(4).split("/");
+    if (!byId(decodeURIComponent(id))) { app.innerHTML = `<div class="empty">Loading room…</div>`; await loadRooms(); }
+    room(byId(decodeURIComponent(id)), si, ss);
+  }
+  else if (h.startsWith("#/room/")) { const [code, si, ss] = h.slice(7).split("/"); room(dec(code), si, ss); }
   else if (h === "#/new") newRoom();
-  else if (h === "#rooms") { home(); document.getElementById("rooms")?.scrollIntoView(); return; }
   else home();
   window.scrollTo(0, 0);
 }
 addEventListener("hashchange", route);
+paintNav();
 route();
 </script>
 <div id="braveGate" hidden style="position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:16px">
   <div class="card" style="max-width:420px;display:grid;gap:12px;text-align:center">
     <h2>Turn on ad blocking</h2>
-    <p class="sub">Streams here can carry ads. Open Couchside in Brave (ad blocking built in), or switch on an ad blocker and reload.</p>
+    <p class="sub">Streams here can carry ads. Open Couch Bandit in Brave (ad blocking built in), or switch on an ad blocker and reload.</p>
     <a class="btn" id="openBrave" href="#">Open in Brave</a>
     <a class="btn alt" href="https://brave.com/download/" rel="noopener">Get Brave</a>
     <p class="note">Already in Brave? Make sure Shields are on, then reload.</p>
@@ -616,10 +698,13 @@ route();
   else { open.removeAttribute("href"); open.textContent = "Copy link, then paste it in Brave"; open.onclick = () => { navigator.clipboard?.writeText(url); open.textContent = "Link copied"; }; }
 })();
 function adsBlocked() {
-  const probe = fetch("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?cs=" + Date.now(), { mode: "no-cors", cache: "no-store" })
-    .then(() => false, () => true);
-  const timeout = new Promise(r => setTimeout(() => r(true), 4000));
-  return Promise.race([probe, timeout]);
+  /* Checks for an ad blocker locally with a bait element, so no request goes to any ad or tracking server */
+  return new Promise(res => {
+    const b = document.createElement("div"); b.className = "adsbox ad-banner adsbygoogle pub_300x250 text-ad";
+    b.style.cssText = "position:absolute;left:-9999px;top:-9999px;width:300px;height:250px";
+    document.body.appendChild(b);
+    setTimeout(() => { const cs = getComputedStyle(b); const hidden = !b.offsetHeight || cs.display === "none" || cs.visibility === "hidden"; b.remove(); res(hidden); }, 400);
+  });
 }
 </script>
 </body>
