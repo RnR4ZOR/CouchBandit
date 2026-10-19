@@ -389,10 +389,11 @@ async function unlockToken() {
     const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unhex(s.iv) }, await aesKey(ownerPass, s.salt), unhex(s.ct));
     return new TextDecoder().decode(pt); } catch (e) { return ""; }
 }
+const cleanKey = k => String(k || "").replace(/[\s"'`\u200b-\u200d\ufeff]/g, "").replace(/[^\x21-\x7e]/g, "");
 async function login(user, pass) {
   const h = hex(await pbkdf2(user + ":" + pass, OWNER.salt, OWNER.iter));
   if (h !== OWNER.hash) return false;
-  isOwner = true; ownerPass = pass; ownerToken = await unlockToken();
+  isOwner = true; ownerPass = pass; ownerToken = cleanKey(await unlockToken());
   try { sessionStorage.setItem("cb-owner", "1"); } catch (e) {}
   return true;
 }
@@ -432,14 +433,18 @@ async function saveRooms(list, msg) {
     if (put.status === 401 || put.status === 403 || put.status === 404) { ownerToken = ""; toast("Your GitHub key can't save to CouchBandit. Make a key for that repo with Contents: Read and write.", 8000); return (await askToken()) ? saveRooms(list, msg) : false; }
     if (!put.ok) { let why = ""; try { why = (await put.json()).message || ""; } catch (e) {} toast("Couldn't save (" + put.status + (why ? ": " + why : "") + "). Try again.", 7000); return false; }
     ROOMS = list; toast("Saved. Live for everyone in about a minute"); return true;
-  } catch (e) { toast("Couldn't reach GitHub. Check your connection."); return false; }
+  } catch (e) {
+    /* A bad character in the saved key makes the browser refuse to send it: ask for the key again */
+    if (e instanceof TypeError && /header|ByteString|code point|Invalid/i.test(e.message)) { ownerToken = ""; toast("Your saved GitHub key has a bad character in it. Paste it again.", 7000); return (await askToken()) ? saveRooms(list, msg) : false; }
+    toast("Couldn't reach GitHub (" + (e.message || e.name) + "). If you use an ad blocker or privacy extension, allow api.github.com, then try again.", 9000); return false;
+  }
 }
 function askToken() {
   return new Promise(done => {
     const d = $("#tokenBox"); d.hidden = false; $("#tk_val").value = ""; $("#tk_val").focus();
     $("#tk_cancel").onclick = () => { d.hidden = true; done(false); };
     $("#tokenForm").onsubmit = async e => {
-      e.preventDefault(); const v = $("#tk_val").value.trim(); if (!v) return;
+      e.preventDefault(); const v = cleanKey($("#tk_val").value); if (!v) return;
       ownerToken = v; await lockToken(v); d.hidden = true; done(true);
     };
   });
