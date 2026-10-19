@@ -33,3 +33,6 @@ The same code runs on GitHub Pages and Cloudflare Pages. On Cloudflare the owner
 4. **Deployments → Retry deployment** (so the settings take effect).
 
 The first time you open the Cloudflare site it shows the rooms from `rooms.json`; your first save copies them onto the server.
+
+## Automatic deploy to GitHub Pages
+Every push to `main` that changes `public/` runs **Deploy to GitHub Pages** (`.github/workflows/deploy-pages.yml`). It copies `public/` to the `gh-pages` branch, which serves https://rnr4zor.github.io/CouchBandit/. The live `rooms.json` is kept, so rooms saved on the site aren't overwritten. To redeploy by hand: **Actions → Deploy to GitHub Pages → Run workflow**.
