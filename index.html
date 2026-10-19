@@ -677,6 +677,7 @@ route();
     <p class="sub">Streams here can carry ads. Open Couch Bandit in Brave (ad blocking built in), or switch on an ad blocker and reload.</p>
     <a class="btn" id="openBrave" href="#">Open in Brave</a>
     <a class="btn alt" href="https://brave.com/download/" rel="noopener">Get Brave</a>
+    <button type="button" class="btn alt" id="stayHere">Continue in current browser</button>
     <p class="note">Already in Brave? Make sure Shields are on, then reload.</p>
   </div>
 </div>
@@ -691,7 +692,9 @@ route();
   try { brave = !!(navigator.brave && await navigator.brave.isBrave()); } catch {}
   if (!brave) brave = await adsBlocked(); /* any browser that blocks ads is fine */
   if (brave) return;
+  try { if (localStorage.getItem("cb-skip-gate")) return; } catch {}
   const g = document.getElementById("braveGate"); g.hidden = false;
+  document.getElementById("stayHere").onclick = () => { try { localStorage.setItem("cb-skip-gate", "1"); } catch {} g.hidden = true; };
   const url = location.href, open = document.getElementById("openBrave");
   if (/Android/i.test(ua)) open.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.brave.browser;end";
   else if (ios) open.href = "brave://open-url?url=" + encodeURIComponent(url);
