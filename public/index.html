@@ -165,13 +165,14 @@ function cleanLink(raw) {
   else if (raw && !/^[a-z][a-z0-9+.-]*:/i.test(raw) && /^[\w-]+(\.[\w-]+)+(:\d+)?(\/|$|\?)/.test(raw)) raw = "https://" + raw;
   return raw;
 }
+const isHost = (host, domain) => host === domain || host.endsWith("." + domain);
 function parse(url) {
   url = cleanLink(url);
   if (/^(rtmps?|rtsp|rtp|udp|srt|mms):\/\//i.test(url)) return { kind: "nobrowser", url, label: url.split(":")[0].toUpperCase() + " stream" };
   let u; try { u = new URL(url); } catch (e) { return { kind: "bad" }; }
   if (!/^https?:$/.test(u.protocol)) return { kind: "bad" };
   const h = u.hostname.replace(/^www\.|^m\./, "");
-  if (h === "youtu.be" || h.endsWith("youtube.com") || h.endsWith("youtube-nocookie.com")) {
+  if (h === "youtu.be" || isHost(h, "youtube.com") || isHost(h, "youtube-nocookie.com")) {
     const id = h === "youtu.be" ? u.pathname.split("/")[1] : u.searchParams.get("v") || (u.pathname.match(/\/(live|embed|shorts|v)\/([\w-]+)/) || [])[2];
     const list = u.searchParams.get("list");
     const t = u.searchParams.get("t") || u.searchParams.get("start") || "";
@@ -180,28 +181,28 @@ function parse(url) {
     if (id && id !== "videoseries") return { kind: "youtube", id, list, start, label: "YouTube" };
     if (list) return { kind: "youtube", list, label: "YouTube playlist" };
   }
-  if (h.endsWith("twitch.tv")) {
+  if (isHost(h, "twitch.tv")) {
     const vid = u.pathname.match(/\/videos\/(\d+)/);
     if (vid) return { kind: "twitch", video: vid[1], label: "Twitch" };
     const ch = u.pathname.split("/").filter(Boolean)[0];
     if (ch) return { kind: "twitch", channel: ch, label: "Twitch" };
   }
-  if (h.endsWith("kick.com")) { const ch = u.pathname.split("/").filter(Boolean)[0]; if (ch) return { kind: "kick", channel: ch, label: "Kick" }; }
-  if (h.endsWith("vimeo.com")) { const mm = u.pathname.match(/(\d{5,})(?:\/([0-9a-f]{6,}))?/); if (mm) return { kind: "vimeo", id: mm[1], hash: u.searchParams.get("h") || mm[2] || "", label: "Vimeo" }; }
+  if (isHost(h, "kick.com")) { const ch = u.pathname.split("/").filter(Boolean)[0]; if (ch) return { kind: "kick", channel: ch, label: "Kick" }; }
+  if (isHost(h, "vimeo.com")) { const mm = u.pathname.match(/(\d{5,})(?:\/([0-9a-f]{6,}))?/); if (mm) return { kind: "vimeo", id: mm[1], hash: u.searchParams.get("h") || mm[2] || "", label: "Vimeo" }; }
   if (h === "drive.google.com" || h === "docs.google.com") {
     const id = (u.pathname.match(/\/d\/([\w-]{10,})/) || [])[1] || u.searchParams.get("id");
     if (id) return { kind: "embed", url: `https://drive.google.com/file/d/${id}/preview`, label: "Google Drive" };
   }
-  if (h.endsWith("dropbox.com") && !h.startsWith("api")) {
+  if (isHost(h, "dropbox.com") && !h.startsWith("api")) {
     const d = new URL(u.href); d.searchParams.delete("dl"); d.searchParams.set("raw", "1");
     return { kind: "file", url: d.href, label: "Dropbox video" };
   }
-  if (h.endsWith("dailymotion.com") || h === "dai.ly") {
+  if (isHost(h, "dailymotion.com") || h === "dai.ly") {
     const id = h === "dai.ly" ? u.pathname.slice(1) : (u.pathname.match(/\/video\/([a-z0-9]+)/i) || [])[1];
     if (id) return { kind: "embed", url: `https://www.dailymotion.com/embed/video/${id}?autoplay=1`, label: "Dailymotion" };
   }
   if (h === "streamable.com") { const id = u.pathname.split("/").filter(x => x && x !== "e" && x !== "o")[0]; if (id) return { kind: "embed", url: `https://streamable.com/e/${id}?autoplay=1`, label: "Streamable" }; }
-  if ((h.endsWith("facebook.com") && /\/(videos|watch|reel)/.test(u.pathname + u.search)) || h === "fb.watch") return { kind: "embed", url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u.href)}&show_text=false&autoplay=true`, label: "Facebook video" };
+  if ((isHost(h, "facebook.com") && /\/(videos|watch|reel)/.test(u.pathname + u.search)) || h === "fb.watch") return { kind: "embed", url: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u.href)}&show_text=false&autoplay=true`, label: "Facebook video" };
   if (/\.m3u8($|\?)/i.test(u.pathname + u.search)) return { kind: "hls", url: u.href, label: "HLS stream" };
   if (/\.mpd($|\?)/i.test(u.pathname + u.search)) return { kind: "dash", url: u.href, label: "DASH stream" };
   if (/\.flv($|\?)/i.test(u.pathname)) return { kind: "flv", url: u.href, label: "FLV stream" };
@@ -508,7 +509,7 @@ function askToken() {
 function roomCard(r) {
   const p = parse(r.items[0].url);
   const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Remove room">✕</button><button type="button" class="star${r.featured ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}" aria-label="${r.featured ? "Remove from featured" : "Add to featured"}">${r.featured ? "★" : "☆"}</button>` : (r.featured ? `<span class="star on" aria-hidden="true">★</span>` : "");
-  return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${esc(p.label || "Stream")}</span>${initials(r.name)}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
+  return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${esc(p.label || "Stream")}</span>${esc(initials(r.name))}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
     <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " stream" : " streams")))}</span></div></a></div>`;
 }
 /* Owner only: star a room to pin it in Featured on the home page */
