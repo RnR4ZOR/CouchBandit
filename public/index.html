@@ -124,7 +124,6 @@ span.star{pointer-events:none}
   <a class="logo" href="#/"><b></b>Couch Bandit</a>
   <a class="l" href="#/">Rooms</a>
   <a class="l" href="#/new" id="addNav" hidden>Add room</a>
-  <button type="button" class="btn alt sm" id="keyBtn" hidden title="Copy your locked GitHub key to use on another device">Key code</button>
   <button type="button" class="btn alt sm" id="ownerBtn">Owner login</button>
 </div></header>
 
@@ -140,8 +139,8 @@ span.star{pointer-events:none}
 </form></div>
 <div class="modal" id="tokenBox" hidden><form class="card" id="tokenForm" autocomplete="off">
   <h2>Connect GitHub (one time)</h2>
-  <p class="note">Saving rooms for everyone needs your GitHub key. It's locked with your owner password and kept only on this device. Already set up on another device? Tap <b>Key code</b> there and paste the code here.</p>
-  <label>GitHub key or key code<input id="tk_val" type="password" required placeholder="github_pat_... or CB1...."></label>
+  <p class="note">Saving rooms for everyone needs your GitHub key. It's locked with your owner password and kept only on this device.</p>
+  <label>GitHub key<input id="tk_val" type="password" required placeholder="github_pat_..."></label>
   <div style="display:flex;gap:8px"><button class="btn" type="submit">Save key</button><button type="button" class="btn alt" id="tk_cancel">Cancel</button></div>
 </form></div>
 <div class="toast" id="toast" hidden></div>
@@ -403,15 +402,6 @@ async function unlockToken() {
     const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unhex(s.iv) }, await aesKey(ownerPass, s.salt), unhex(s.ct));
     return new TextDecoder().decode(pt); } catch (e) { return ""; }
 }
-/* Key code: the same locked key, as text you can move to another device. Useless without the owner password. */
-function keyCode() {
-  try { const s = JSON.parse(localStorage.getItem("cb-owner-key")); return s ? `CB1.${s.salt}.${s.iv}.${s.ct}` : ""; } catch (e) { return ""; }
-}
-async function importKeyCode(code) {
-  const m = /^CB1\.([0-9a-f]{32})\.([0-9a-f]{24})\.([0-9a-f]+)$/i.exec(code); if (!m) return "";
-  try { const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unhex(m[2]) }, await aesKey(ownerPass, m[1]), unhex(m[3]));
-    const tok = cleanKey(new TextDecoder().decode(pt)); if (tok) await lockToken(tok); return tok; } catch (e) { return ""; }
-}
 const cleanKey = k =>String(k || "").replace(/[\s"'`\u200b-\u200d\ufeff]/g, "").replace(/[^\x21-\x7e]/g, "");
 async function login(user, pass) {
   if (await serverMode()) {
@@ -433,17 +423,7 @@ function logout() { setPass(""); isOwner = false; ownerPass = ""; ownerToken = "
 function paintNav() {
   $("#ownerBtn").textContent = isOwner ? "Log out" : "Owner login";
   $("#addNav").hidden = !isOwner;
-  $("#keyBtn").hidden = !isOwner || SERVER_ON;
 }
-$("#keyBtn").onclick = async () => {
-  if (!ownerToken && !(await askToken())) return;
-  const code = keyCode();
-  if (!code) { toast("This browser couldn't store the key, so there's no code to copy.", 6000); return; }
-  let copied = false;
-  try { await navigator.clipboard.writeText(code); copied = true; } catch (e) {}
-  if (!copied) prompt("Copy this key code:", code);
-  toast("Key code copied. On the other device, log in as owner, tap Key code and paste it.", 8000);
-};
 function showLogin() {
   const d = $("#loginBox"); d.hidden = false; $("#lg_user").value = ""; $("#lg_pass").value = ""; $("#lg_msg").textContent = ""; $("#lg_user").focus();
 }
@@ -495,11 +475,6 @@ function askToken() {
     $("#tk_cancel").onclick = () => { d.hidden = true; done(false); };
     $("#tokenForm").onsubmit = async e => {
       e.preventDefault(); const v = cleanKey($("#tk_val").value); if (!v) return;
-      if (/^CB1\./i.test(v)) {
-        const t = await importKeyCode(v);
-        if (!t) { toast("That key code didn't unlock. Copy it again, and log in with the same owner password on both devices.", 8000); return; }
-        ownerToken = t; d.hidden = true; toast("Key added to this device"); done(true); return;
-      }
       ownerToken = v; await lockToken(v); d.hidden = true; done(true);
     };
   });
