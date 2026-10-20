@@ -21,7 +21,11 @@ Playback engines (loaded only when needed): YouTube, Twitch, Kick and Vimeo embe
 
 Only share streams you have the right to share.
 
-## Couch Bandit on Cloudflare (log in anywhere, no GitHub key)
+## Automatic Cloudflare deploy (recommended)
+
+Add four secrets in GitHub (**Settings → Secrets and variables → Actions**): `CLOUDFLARE_API_TOKEN` (Account permissions: Cloudflare Pages Edit, Workers KV Storage Edit), `CLOUDFLARE_ACCOUNT_ID`, `OWNER_USER`, `OWNER_PASS`. Then **Actions → Deploy to Cloudflare → Run workflow** once. It creates the Pages project and room storage, copies your current rooms across, sets the owner login and deploys to `https://couchbandit.pages.dev`. Every push to `main` after that redeploys by itself.
+
+## Couch Bandit on Cloudflare (log in anywhere, no GitHub key) (manual setup)
 
 The same code runs on GitHub Pages and Cloudflare Pages. On Cloudflare the owner login is checked by the server and rooms are saved on the server, so Masterkey can log in on any device and save straight away.
 

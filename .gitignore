@@ -36,3 +36,4 @@ google-services.json
 
 # Local Netlify folder
 .netlify
+wrangler.toml

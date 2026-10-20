@@ -1,0 +1,89 @@
+# Publishes Couch Bandit to Cloudflare Pages (https://couchbandit.pages.dev) on every push to main.
+# On Cloudflare, rooms are saved on the server: the owner logs in on any device and saves straight away,
+# and friends see changes within seconds.
+#
+# One-time setup, in GitHub: Settings -> Secrets and variables -> Actions -> New repository secret
+#   CLOUDFLARE_API_TOKEN   token with Account permissions "Cloudflare Pages: Edit" and "Workers KV Storage: Edit"
+#   CLOUDFLARE_ACCOUNT_ID  your Cloudflare account ID
+#   OWNER_USER             your owner username
+#   OWNER_PASS             your owner password
+# Then run it once from Actions -> Deploy to Cloudflare -> Run workflow. Everything else is automatic:
+# it creates the Pages project and room storage, copies your current rooms across the first time,
+# sets the owner login and deploys.
+name: Deploy to Cloudflare
+on:
+  push:
+    branches: [main]
+    paths: ["public/**", "functions/**", ".github/workflows/deploy-cloudflare.yml"]
+  workflow_dispatch:
+concurrency:
+  group: cloudflare
+  cancel-in-progress: false
+env:
+  PROJECT: couchbandit
+  KV_TITLE: couchbandit-rooms
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Cloudflare is connected
+        id: ready
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "Cloudflare isn't connected yet. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in repo secrets."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else echo "go=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.go == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.ready.outputs.go == 'true'
+        with: { node-version: 20 }
+      - name: Install Wrangler
+        if: steps.ready.outputs.go == 'true'
+        run: npm i -g wrangler@4
+      - name: Room storage (create once)
+        if: steps.ready.outputs.go == 'true'
+        id: kv
+        run: |
+          find_id() { wrangler kv namespace list | jq -r --arg t "$KV_TITLE" '.[] | select(.title == $t) | .id' | head -1; }
+          ID=$(find_id)
+          if [ -z "$ID" ]; then wrangler kv namespace create "$KV_TITLE"; ID=$(find_id); fi
+          [ -n "$ID" ] || { echo "Couldn't create room storage. Check the API token has Workers KV Storage: Edit."; exit 1; }
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          cat > wrangler.toml <<EOF
+          name = "$PROJECT"
+          pages_build_output_dir = "public"
+          compatibility_date = "2025-01-01"
+          [[kv_namespaces]]
+          binding = "ROOMS"
+          id = "$ID"
+          EOF
+          sed -i 's/^ *//' wrangler.toml
+      - name: Copy current rooms across (first time only)
+        if: steps.ready.outputs.go == 'true'
+        run: |
+          if wrangler kv key get room-list --namespace-id "${{ steps.kv.outputs.id }}" --remote > /tmp/cur.json 2>/dev/null && jq -e 'type == "array"' /tmp/cur.json >/dev/null 2>&1; then
+            echo "Rooms already on Cloudflare: $(jq length /tmp/cur.json). Leaving them alone."
+          else
+            curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/rooms.json" -o /tmp/seed.json || echo "[]" > /tmp/seed.json
+            jq -e 'type == "array"' /tmp/seed.json >/dev/null || echo "[]" > /tmp/seed.json
+            wrangler kv key put room-list --path /tmp/seed.json --namespace-id "${{ steps.kv.outputs.id }}" --remote
+            echo "Copied $(jq length /tmp/seed.json) rooms from GitHub Pages."
+          fi
+      - name: Pages project (create once)
+        if: steps.ready.outputs.go == 'true'
+        run: wrangler pages project create "$PROJECT" --production-branch main 2>/dev/null || echo "Project already exists."
+      - name: Owner login
+        if: steps.ready.outputs.go == 'true'
+        env:
+          OWNER_USER: ${{ secrets.OWNER_USER }}
+          OWNER_PASS: ${{ secrets.OWNER_PASS }}
+        run: |
+          if [ -z "$OWNER_USER" ] || [ -z "$OWNER_PASS" ]; then echo "OWNER_USER / OWNER_PASS not set. Owner login on Cloudflare will be off."; exit 0; fi
+          printf '%s' "$OWNER_USER" | wrangler pages secret put OWNER_USER --project-name "$PROJECT"
+          printf '%s' "$OWNER_PASS" | wrangler pages secret put OWNER_PASS --project-name "$PROJECT"
+      - name: Deploy
+        if: steps.ready.outputs.go == 'true'
+        run: wrangler pages deploy --project-name "$PROJECT" --branch main --commit-dirty=true
