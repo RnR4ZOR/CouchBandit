@@ -41,7 +41,7 @@ h1{font-size:clamp(40px,7vw,78px);line-height:.95}
 h2{font-size:28px}
 .sub{color:var(--muted);margin:0;max-width:60ch}
 .note{font-size:13px;color:var(--muted)}
-main{padding-block:28px 64px;display:grid;gap:36px}
+main{padding-block:28px 64px;display:grid;grid-template-columns:minmax(0,1fr);gap:36px}
 .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:start}
 @media(max-width:860px){.hero{grid-template-columns:1fr}}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:20px;display:grid;gap:14px}
@@ -819,7 +819,7 @@ serverMode().then(on => { SERVER_ON = on; if (on && getPass()) { isOwner = true;
   const url = location.href, open = document.getElementById("openBrave");
   if (/Android/i.test(ua)) open.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.brave.browser;end";
   else if (ios) open.href = "brave://open-url?url=" + encodeURIComponent(url);
-  else { open.removeAttribute("href"); open.textContent = "Copy link, then paste it in Brave"; open.onclick = () => { navigator.clipboard?.writeText(url); open.textContent = "Link copied"; }; }
+  else { open.removeAttribute("href"); open.textContent = "Copy link, then paste it in Brave"; open.onclick = () => { const done = () => open.textContent = "Link copied", fail = () => { prompt("Copy this link, then paste it in Brave:", url); }; navigator.clipboard ? navigator.clipboard.writeText(url).then(done, fail) : fail(); }; }
 })();
 function adsBlocked() {
   /* Checks for an ad blocker locally with a bait element, so no request goes to any ad or tracking server */
