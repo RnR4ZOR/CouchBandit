@@ -393,6 +393,10 @@ async function loadRooms() {
   try {
     let list = null;
     if (await serverMode()) { const res = await fetch("api/rooms", { cache: "no-store" }); if (res.ok) list = await res.json(); }
+    /* GitHub Pages: read the saved list straight from GitHub so new rooms show within seconds instead of
+       waiting up to 10 minutes for the published copy. Free limit is 60 reads an hour per person; past that
+       it falls back to the published rooms.json. */
+    else try { const res = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/${REPO.path}?ref=${REPO.branch}&t=${Date.now()}`, { headers: { Accept: "application/vnd.github.raw+json" }, cache: "no-store" }); if (res.ok) list = await res.json(); } catch (e) {}
     /* first run on Cloudflare: show the rooms from rooms.json until the owner saves */
     if (!Array.isArray(list)) { const res = await fetch("rooms.json?v=" + Date.now(), { cache: "no-store" }); if (res.ok) list = await res.json(); }
     if (Array.isArray(list)) ROOMS = list.filter(okRoom);
@@ -576,6 +580,9 @@ function home() {
     const list = sorted(ROOMS).filter(pass).filter(r => !q || (r.name + " " + (r.topic || "")).toLowerCase().includes(q));
     box.innerHTML = list.length ? `<div class="rooms">${list.map(roomCard).join("")}</div>` : `<div class="empty">${q || f !== "all" ? "No rooms match that." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`; };
   paint(); loadRooms().then(paint);
+  /* keep the list fresh while friends sit on the home page: every 90 seconds, and when they come back to the tab */
+  clearInterval(liveT); liveT = setInterval(() => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); }, 90e3);
+  onvisibilitychange = () => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); };
   $("#roomSearch").addEventListener("input", paint);
   $("#filters").addEventListener("click", e => { const b = e.target.closest("[data-filter]"); if (!b) return; $("#filters").querySelectorAll("[data-filter]").forEach(x => x.setAttribute("aria-pressed", x === b)); paint(); });
 }
@@ -639,7 +646,7 @@ function newRoom() {
   app.innerHTML = `<section style="max-width:720px;width:100%;margin:0 auto;display:grid;gap:16px"><a href="#/" class="note">← All rooms</a><form class="card" id="newForm">${roomForm({}, "Add a room")}</form></section>`;
   const f = $("#newForm"); bindStreams(f); f.addEventListener("submit", e => { e.preventDefault(); submitRoom(f, {}); });
 }
-let timer, remindT;
+let timer, remindT, liveT;
 /* ===== Full screen: real full screen where the browser allows it,
    otherwise (iPhone) the player fills the whole screen inside the page ===== */
 let wantFull = false;
@@ -775,7 +782,7 @@ function room(r, si, ss) {
 }
 
 async function route() {
-  clearInterval(timer); onkeydown = null;
+  clearInterval(timer); clearInterval(liveT); onkeydown = null; onvisibilitychange = null;
   const h = location.hash || "#/";
   if (h.startsWith("#/r/")) {
     const [id, si, ss] = h.slice(4).split("/");
