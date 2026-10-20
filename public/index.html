@@ -394,11 +394,13 @@ async function loadRooms() {
     let list = null;
     if (await serverMode()) { const res = await fetch("api/rooms", { cache: "no-store" }); if (res.ok) list = await res.json(); }
     /* first run on Cloudflare: show the rooms from rooms.json until the owner saves */
-    if (!list || !list.length) { const res = await fetch("rooms.json?v=" + Date.now(), { cache: "no-store" }); if (res.ok) list = await res.json(); }
+    if (!Array.isArray(list)) { const res = await fetch("rooms.json?v=" + Date.now(), { cache: "no-store" }); if (res.ok) list = await res.json(); }
     if (Array.isArray(list)) ROOMS = list.filter(okRoom);
   } catch (e) {}
   /* the published file can lag up to 10 minutes behind a save, so for 10 minutes trust this device's latest save */
   try { const l = JSON.parse(localStorage.getItem("cb-last-save") || "null"); if (l && Date.now() - l.at < 600e3 && Array.isArray(l.list)) ROOMS = l.list.filter(okRoom); } catch (e) {}
+  /* the owner always sees the true saved list, straight from GitHub */
+  if (isOwner && ownerToken && !getPass()) try { const c = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/${REPO.path}?ref=${REPO.branch}&t=${Date.now()}`, { headers: { Authorization: "Bearer " + ownerToken, Accept: "application/vnd.github+json" }, cache: "no-store" }); if (c.ok) { const m = await c.json(); if (m.content) ROOMS = asList(JSON.parse(decodeURIComponent(escape(atob(m.content.replace(/\s/g, "")))))); } } catch (e) {}
   return ROOMS;
 }
 /* Owner pass from the Cloudflare login, kept on this device for 30 days */
@@ -477,7 +479,7 @@ async function saveRooms(change, msg, retried) {
     try {
       const g = await fetch("api/rooms", { cache: "no-store" });
       if (!g.ok) { toast("Couldn't load the latest rooms (" + g.status + "). Nothing was changed.", 7000); return false; }
-      let fresh = asList(await g.json()); if (!fresh.length) fresh = asList(ROOMS);
+      const raw = await g.json(); let fresh = raw === null ? asList(ROOMS) : asList(raw);
       const list = change(fresh);
       const r = await fetch("api/rooms", { method: "PUT", headers: { "content-type": "application/json", Authorization: "Bearer " + getPass() }, body: JSON.stringify(list) });
       if (r.status === 401) { setPass(""); isOwner = false; paintNav(); toast("Your owner login expired. Log in again.", 6000); return false; }

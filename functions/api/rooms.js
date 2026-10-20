@@ -19,7 +19,7 @@ const clean = list => (Array.isArray(list) ? list : []).filter(r => r && typeof 
 export async function onRequest({ request, env }) {
   const kv = env.ROOMS;
   if (!kv) return json({ error: "Room storage isn't connected. Bind a KV namespace named ROOMS in Cloudflare." }, 503);
-  if (request.method === "GET") return json((await kv.get(KEY, "json")) || []);
+  if (request.method === "GET") return json(await kv.get(KEY, "json")); // null = never saved, [] = all rooms deleted
   if (request.method === "PUT") {
     if (!(await isOwner(request, env))) return json({ error: "Log in as owner again." }, 401);
     let list; try { list = await request.json(); } catch { return json({ error: "bad body" }, 400); }
