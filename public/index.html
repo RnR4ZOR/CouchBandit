@@ -123,6 +123,9 @@ span.star{pointer-events:none}
 .badge.live{background:var(--live);color:#fff}.badge.live::before{display:none}
 .badge.soon{background:var(--accent);color:var(--accent-ink)}
 .keys{font-size:12px;color:var(--muted)}.keys kbd{font:700 11px var(--body);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--ink);background:var(--raise)}
+.stage.theater{grid-template-columns:1fr}.stage.theater .side{display:none}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters .chip{padding:6px 12px}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -394,8 +397,8 @@ async function loadRooms() {
     if (!list || !list.length) { const res = await fetch("rooms.json?v=" + Date.now(), { cache: "no-store" }); if (res.ok) list = await res.json(); }
     if (Array.isArray(list)) ROOMS = list.filter(okRoom);
   } catch (e) {}
-  /* the published file lags about a minute behind a save, so for 3 minutes trust this device's latest save */
-  try { const l = JSON.parse(localStorage.getItem("cb-last-save") || "null"); if (l && Date.now() - l.at < 180e3 && Array.isArray(l.list)) ROOMS = l.list.filter(okRoom); } catch (e) {}
+  /* the published file can lag up to 10 minutes behind a save, so for 10 minutes trust this device's latest save */
+  try { const l = JSON.parse(localStorage.getItem("cb-last-save") || "null"); if (l && Date.now() - l.at < 600e3 && Array.isArray(l.list)) ROOMS = l.list.filter(okRoom); } catch (e) {}
   return ROOMS;
 }
 /* Owner pass from the Cloudflare login, kept on this device for 30 days */
@@ -464,11 +467,18 @@ $("#loginForm").addEventListener("submit", async e => {
 });
 
 const keepSave = list => { try { localStorage.setItem("cb-last-save", JSON.stringify({ at: Date.now(), list })); } catch (e) {} };
-/* Save the room list for everyone: writes rooms.json to the site through GitHub. Live for everyone in about a minute. */
-async function saveRooms(list, msg) {
+/* Save for everyone. `change` turns the latest saved room list into the new one. It always runs on the list
+   freshly read from storage (never the copy this page loaded earlier), so a save can't wipe out rooms or stars
+   from an earlier save that the public site hadn't caught up with yet. Rooms only go when the owner deletes them. */
+const asList = x => Array.isArray(x) ? x.filter(okRoom) : [];
+async function saveRooms(change, msg, retried) {
   if (!isOwner) { toast("Only the owner can change rooms"); return false; }
   if (getPass()) {
     try {
+      const g = await fetch("api/rooms", { cache: "no-store" });
+      if (!g.ok) { toast("Couldn't load the latest rooms (" + g.status + "). Nothing was changed.", 7000); return false; }
+      let fresh = asList(await g.json()); if (!fresh.length) fresh = asList(ROOMS);
+      const list = change(fresh);
       const r = await fetch("api/rooms", { method: "PUT", headers: { "content-type": "application/json", Authorization: "Bearer " + getPass() }, body: JSON.stringify(list) });
       if (r.status === 401) { setPass(""); isOwner = false; paintNav(); toast("Your owner login expired. Log in again.", 6000); return false; }
       if (!r.ok) { let why = ""; try { why = (await r.json()).error || ""; } catch (e) {} toast("Couldn't save (" + r.status + (why ? ": " + why : "") + ").", 7000); return false; }
@@ -480,18 +490,25 @@ async function saveRooms(list, msg) {
   const hdr = { Authorization: "Bearer " + ownerToken, Accept: "application/vnd.github+json" };
   try {
     const cur = await fetch(api + "?ref=" + REPO.branch + "&t=" + Date.now(), { headers: hdr, cache: "no-store" });
-    if (cur.status === 401) { ownerToken = ""; toast("That GitHub key isn't valid or has expired. Paste a new one.", 6000); return (await askToken()) ? saveRooms(list, msg) : false; }
-    if (cur.status === 403) { ownerToken = ""; toast("Your GitHub key doesn't have access to CouchBandit. Make a key for that repo with Contents: Read and write.", 8000); return (await askToken()) ? saveRooms(list, msg) : false; }
-    const sha = cur.ok ? (await cur.json()).sha : undefined;
+    if (cur.status === 401) { ownerToken = ""; toast("That GitHub key isn't valid or has expired. Paste a new one.", 6000); return (await askToken()) ? saveRooms(change, msg) : false; }
+    if (cur.status === 403) { ownerToken = ""; toast("Your GitHub key doesn't have access to CouchBandit. Make a key for that repo with Contents: Read and write.", 8000); return (await askToken()) ? saveRooms(change, msg) : false; }
+    if (!cur.ok && cur.status !== 404) { toast("Couldn't load the latest rooms (" + cur.status + "). Nothing was changed.", 7000); return false; }
+    const meta = cur.ok ? await cur.json() : {};
+    const sha = meta.sha;
+    let fresh = [];
+    if (meta.content) fresh = asList(JSON.parse(decodeURIComponent(escape(atob(meta.content.replace(/\s/g, ""))))));
+    else if (meta.download_url) fresh = asList(await (await fetch(meta.download_url + "?t=" + Date.now(), { cache: "no-store" })).json());
+    const list = change(fresh);
     const body = JSON.stringify(list, null, 2);
     const content = btoa(unescape(encodeURIComponent(body)));
     const put = await fetch(api, { method: "PUT", headers: hdr, body: JSON.stringify({ message: msg || "Update rooms", content, sha, branch: REPO.branch }) });
-    if (put.status === 401 || put.status === 403 || put.status === 404) { ownerToken = ""; toast("Your GitHub key can't save to CouchBandit. Make a key for that repo with Contents: Read and write.", 8000); return (await askToken()) ? saveRooms(list, msg) : false; }
+    if (put.status === 401 || put.status === 403 || put.status === 404) { ownerToken = ""; toast("Your GitHub key can't save to CouchBandit. Make a key for that repo with Contents: Read and write.", 8000); return (await askToken()) ? saveRooms(change, msg) : false; }
+    if ((put.status === 409 || put.status === 422) && !retried) return saveRooms(change, msg, true); /* saved in between: redo on the newer list */
     if (!put.ok) { let why = ""; try { why = (await put.json()).message || ""; } catch (e) {} toast("Couldn't save (" + put.status + (why ? ": " + why : "") + "). Try again.", 7000); return false; }
     ROOMS = list; keepSave(list); toast("Saved. Live for everyone in about a minute"); return true;
   } catch (e) {
     /* A bad character in the saved key makes the browser refuse to send it: ask for the key again */
-    if (e instanceof TypeError && /header|ByteString|code point|Invalid/i.test(e.message)) { ownerToken = ""; toast("Your saved GitHub key has a bad character in it. Paste it again.", 7000); return (await askToken()) ? saveRooms(list, msg) : false; }
+    if (e instanceof TypeError && /header|ByteString|code point|Invalid/i.test(e.message)) { ownerToken = ""; toast("Your saved GitHub key has a bad character in it. Paste it again.", 7000); return (await askToken()) ? saveRooms(change, msg) : false; }
     toast("Couldn't reach GitHub (" + (e.message || e.name) + "). If you use an ad blocker or privacy extension, allow api.github.com, then try again.", 9000); return false;
   }
 }
@@ -508,7 +525,7 @@ function askToken() {
 
 function roomCard(r) {
   const p = parse(r.items[0].url);
-  const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Remove room">✕</button><button type="button" class="star${r.featured ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}" aria-label="${r.featured ? "Remove from featured" : "Add to featured"}">${r.featured ? "★" : "☆"}</button>` : (r.featured ? `<span class="star on" aria-hidden="true">★</span>` : "");
+  const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Delete room" title="Delete room">✕</button><button type="button" class="star${r.featured ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}" aria-label="${r.featured ? "Remove from featured" : "Add to featured"}">${r.featured ? "★" : "☆"}</button>` : (r.featured ? `<span class="star on" aria-hidden="true">★</span>` : "");
   return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${esc(p.label || "Stream")}</span>${initials(r.name)}${isLive(r) ? `<span class="badge live">Live</span>` : isSoon(r) ? `<span class="badge soon">Soon</span>` : ""}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
     <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " stream" : " streams")))}</span></div></a></div>`;
 }
@@ -518,7 +535,7 @@ async function toggleStar(id) {
   if (!ROOMS.length) await loadRooms();
   const r = byId(id); if (!r) return false;
   const on = !r.featured; /* tap again to unstar */
-  return saveRooms(ROOMS.map(x => x.id === id ? { ...x, featured: on } : x), (on ? "Feature room: " : "Unfeature room: ") + r.name);
+  return saveRooms(list => list.map(x => x.id === id ? { ...x, featured: on } : x), (on ? "Feature room: " : "Unfeature room: ") + r.name);
 }
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-star]"); if (!b) return;
@@ -545,23 +562,26 @@ function home() {
     <div id="recentList"></div>
   </section>
   <section id="rooms">
-    <div class="secthead"><h2>All rooms</h2><div class="tools"><input id="roomSearch" type="search" placeholder="Search rooms" aria-label="Search rooms">${isOwner ? `<span class="note">☆ features a room (tap again to unfeature), ✕ removes it</span>` : ""}</div></div>
+    <div class="secthead"><h2>All rooms</h2><div class="tools"><div class="filters" id="filters" role="group" aria-label="Filter rooms"><button type="button" class="chip" data-filter="all" aria-pressed="true">All</button><button type="button" class="chip" data-filter="live" aria-pressed="false">Live</button><button type="button" class="chip" data-filter="soon" aria-pressed="false">Upcoming</button><button type="button" class="chip" data-filter="featured" aria-pressed="false">Featured</button></div><input id="roomSearch" type="search" placeholder="Search rooms" aria-label="Search rooms">${isOwner ? `<span class="note">☆ features a room (tap again to unfeature), ✕ deletes it</span>` : ""}</div></div>
     <div id="roomList"><div class="empty">Loading rooms…</div></div>
   </section>`;
   const paint = () => { const box = $("#roomList"); if (!box) return;
     const feat = ROOMS.filter(r => r.featured); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
     const rec = recent.get().map(byId).filter(Boolean); $("#recentSec").hidden = !rec.length; $("#recentList").innerHTML = rec.length ? `<div class="rooms">${rec.slice(0, 3).map(roomCard).join("")}</div>` : "";
     const q = ($("#roomSearch")?.value || "").trim().toLowerCase();
-    const list = sorted(ROOMS).filter(r => !q || (r.name + " " + (r.topic || "")).toLowerCase().includes(q));
-    box.innerHTML = list.length ? `<div class="rooms">${list.map(roomCard).join("")}</div>` : `<div class="empty">${q ? "No rooms match that search." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`; };
+    const f = $("#filters [aria-pressed='true']")?.dataset.filter || "all";
+    const pass = r => f === "all" || (f === "live" && isLive(r)) || (f === "soon" && r.start && new Date(r.start) > new Date()) || (f === "featured" && r.featured);
+    const list = sorted(ROOMS).filter(pass).filter(r => !q || (r.name + " " + (r.topic || "")).toLowerCase().includes(q));
+    box.innerHTML = list.length ? `<div class="rooms">${list.map(roomCard).join("")}</div>` : `<div class="empty">${q || f !== "all" ? "No rooms match that." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`; };
   paint(); loadRooms().then(paint);
   $("#roomSearch").addEventListener("input", paint);
+  $("#filters").addEventListener("click", e => { const b = e.target.closest("[data-filter]"); if (!b) return; $("#filters").querySelectorAll("[data-filter]").forEach(x => x.setAttribute("aria-pressed", x === b)); paint(); });
 }
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-rm]"); if (!b) return;
   e.preventDefault(); if (!isOwner) return;
-  const r = byId(b.dataset.rm); if (!r || !confirm(`Remove "${r.name}" for everyone?`)) return;
-  if (await saveRooms(ROOMS.filter(x => x.id !== r.id), "Remove room: " + r.name)) home();
+  const r = byId(b.dataset.rm); if (!r || !confirm(`Delete "${r.name}" for everyone?`)) return;
+  if (await saveRooms(list => list.filter(x => x.id !== r.id), "Delete room: " + r.name)) { if (location.hash === "#/" || !location.hash) home(); else location.hash = "#/"; }
 });
 
 /* ===== Stream editor: each stream has a main link plus any number of backup links ===== */
@@ -608,10 +628,7 @@ async function submitRoom(form, old) {
   const sb = form.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Saving…";
   await verifyItems(items, false);
   const nr = { id: old.id || newId(), created: old.created || Date.now(), featured: !!old.featured, name: $("#ed_name").value.trim() || "Room", topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
-  await loadRooms();
-  const list = old.id ? ROOMS.map(x => x.id === old.id ? nr : x) : [...ROOMS, nr];
-  if (old.id && !byId(old.id)) list.push(nr);
-  const ok = await saveRooms(list, (old.id ? "Update room: " : "Add room: ") + nr.name);
+  const ok = await saveRooms(list => list.some(x => x.id === nr.id) ? list.map(x => x.id === nr.id ? { ...nr, featured: !!x.featured } : x) : [...list, nr], (old.id ? "Update room: " : "Add room: ") + nr.name);
   sb.disabled = false; sb.textContent = "Save room";
   if (ok) location.hash = "#/r/" + encodeURIComponent(nr.id);
 }
@@ -620,7 +637,7 @@ function newRoom() {
   app.innerHTML = `<section style="max-width:720px;width:100%;margin:0 auto;display:grid;gap:16px"><a href="#/" class="note">← All rooms</a><form class="card" id="newForm">${roomForm({}, "Add a room")}</form></section>`;
   const f = $("#newForm"); bindStreams(f); f.addEventListener("submit", e => { e.preventDefault(); submitRoom(f, {}); });
 }
-let timer;
+let timer, remindT;
 /* ===== Full screen: real full screen where the browser allows it,
    otherwise (iPhone) the player fills the whole screen inside the page ===== */
 let wantFull = false;
@@ -665,8 +682,8 @@ function room(r, si, ss) {
   <a href="#/" class="note">← All rooms</a>
   <div id="switcher">${switcherHTML(r)}</div>
   <div class="roomhead"><div style="display:grid;gap:4px"><span class="live" id="liveTag">Room open</span><h1 style="font-size:clamp(26px,4vw,40px)">${esc(r.name)}</h1><span class="note">${esc(r.topic || "")}</span></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button>${isOwner && r.id ? `<button class="btn alt" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}">${r.featured ? "★ Featured" : "☆ Feature"}</button><button class="btn alt" id="editBtn">Edit room</button>` : ""}<button class="btn alt" id="fsBtn">Full screen</button></div></div>
-  <div class="stage">
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button>${isOwner && r.id ? `<button class="btn alt" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}">${r.featured ? "★ Featured" : "☆ Feature"}</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" data-rm="${esc(r.id)}">Delete room</button>` : ""}<button class="btn alt" id="theaterBtn" aria-pressed="false">Theater</button><button class="btn alt" id="pipBtn" hidden>Pop out</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
+  <div class="stage" id="stage">
     <div style="display:grid;gap:12px;min-width:0">
       <div class="player" id="player"><button type="button" class="tapfs" id="tapFs">▶ Tap to watch full screen</button><button type="button" class="exitfs" id="exitFs">✕ Exit full screen</button></div>
       <div class="srcbar" id="srcbar"></div>
@@ -674,8 +691,8 @@ function room(r, si, ss) {
       <form class="card" id="editor" hidden></form>
     </div>
     <aside class="side">
-      <div class="card"><h3>Invite your mates</h3><div class="sharebox"><input id="shareLink" readonly value="${esc(link)}" aria-label="Room link"><button class="btn sm" id="copyBtn">Copy</button></div><span class="note">Anyone with this link can join. No account needed.</span></div>
-      <div class="card"><h3>Streams</h3><ul class="queue" id="queue"></ul><span class="keys"><kbd>F</kbd> full screen · <kbd>B</kbd> next backup · <kbd>N</kbd> next stream</span></div>
+      <div class="card"><h3>Invite your mates</h3><div class="sharebox"><input id="shareLink" readonly value="${esc(link)}" aria-label="Room link" onfocus="this.select()"></div><span class="note">Anyone with this link can join. No account needed.</span></div>
+      <div class="card"><h3>Streams</h3><ul class="queue" id="queue"></ul><span class="keys"><kbd>F</kbd> full screen · <kbd>T</kbd> theater · <kbd>B</kbd> next backup · <kbd>N</kbd> next stream</span></div>
       <div class="card" id="chatCard" hidden><h3>Chat</h3><iframe class="chatframe" id="chat" sandbox="allow-scripts allow-same-origin allow-forms" title="Stream chat"></iframe></div>
     </aside>
   </div>`;
@@ -690,6 +707,9 @@ function room(r, si, ss) {
     $("#player").querySelectorAll(".layer").forEach(l => l.remove());
     $("#player").insertAdjacentHTML("afterbegin", `<div class="layer on">${playerHTML(p)}</div>`);
     const layer = $("#player").querySelector(".layer");
+    /* a video that finishes rolls on to the next stream in the room */
+    layer.addEventListener("ended", () => { if (layer.isConnected && idx + 1 < r.items.length) { toast("Up next: " + r.items[idx + 1].title); show(idx + 1, 0, true); } }, true);
+    $("#pipBtn").hidden = !(document.pictureInPictureEnabled && layer.querySelector("video"));
     mountVideo(layer, p, () => { const n = sourcesOf(r.items[idx]).length; if (src + 1 < n) { toast("Stream dropped. Loading backup " + (src + 1)); show(idx, src + 1); } else { toast("None of the links played. Try another stream."); } });
     history.replaceState(null, "", `${base}/${idx}/${src}`);
     const list = sourcesOf(r.items[idx]);
@@ -705,9 +725,15 @@ function room(r, si, ss) {
   $("#tapFs").onclick = () => goFull();
   $("#exitFs").onclick = () => exitFull();
   if (wantFull) { wantFull = false; goFull(); }
-  $("#copyBtn").onclick = () => { const sel = () => { $("#shareLink").select(); toast("Link selected, copy it"); }; navigator.clipboard ? navigator.clipboard.writeText(link).then(() => toast("Link copied"), sel) : sel(); };
-  $("#shareBtn").onclick = async () => { if (navigator.share) { try { await navigator.share({ title: r.name, text: `Join me on Couch Bandit: ${r.name}`, url: link }); } catch (e) {} } else $("#copyBtn").click(); };
+  $("#shareBtn").onclick = async () => { if (navigator.share) { try { await navigator.share({ title: r.name, text: `Join me on Couch Bandit: ${r.name}`, url: link }); } catch (e) {} return; }
+    const sel = () => { $("#shareLink").select(); toast("Link selected, copy it"); }; navigator.clipboard ? navigator.clipboard.writeText(link).then(() => toast("Link copied"), sel) : sel(); };
   $("#fsBtn").onclick = () => goFull();
+  /* Theater: hide the side panel so the player fills the width; remembered on this device */
+  const setTheater = on => { $("#stage").classList.toggle("theater", on); $("#theaterBtn").setAttribute("aria-pressed", on); try { localStorage.setItem("cb-theater", on ? "1" : ""); } catch (e) {} };
+  try { setTheater(!!localStorage.getItem("cb-theater")); } catch (e) {}
+  $("#theaterBtn").onclick = () => setTheater(!$("#stage").classList.contains("theater"));
+  /* Pop out: keep watching in a small floating window */
+  $("#pipBtn").onclick = async () => { const v = $("#player video"); if (!v) return; try { document.pictureInPictureElement ? await document.exitPictureInPicture() : await v.requestPictureInPicture(); } catch (e) { toast("This stream can't pop out yet. Let it start playing first."); } };
 
   /* Owner only: edit the room's streams and backups */
   const ed = $("#editor");
@@ -726,7 +752,13 @@ function room(r, si, ss) {
       const h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4), s = Math.floor(ms % 6e4 / 1e3);
       cd.innerHTML = `<span class="note">Party starts in</span><span class="count">${h ? h + "h " : ""}${m}m ${String(s).padStart(2, "0")}s</span><span class="note">${new Date(r.start).toLocaleString(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" })} your time</span>`; };
     tick(); timer = setInterval(tick, 1000);
-    cd.insertAdjacentHTML("afterend", `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt sm" id="calBtn">📅 Add to calendar</button></div>`);
+    cd.insertAdjacentHTML("afterend", `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt sm" id="calBtn">📅 Add to calendar</button>${"Notification" in window ? `<button type="button" class="btn alt sm" id="remindBtn">🔔 Remind me</button>` : ""}</div>`);
+    const rb = $("#remindBtn");
+    if (rb) rb.onclick = async () => {
+      if (Notification.permission !== "granted" && (await Notification.requestPermission()) !== "granted") { toast("Allow notifications to get a reminder"); return; }
+      clearTimeout(remindT); remindT = setTimeout(() => { try { new Notification(r.name + " is starting", { body: "Your Couch Bandit room is live." }); } catch (e) {} }, Math.max(0, new Date(r.start) - Date.now()));
+      rb.textContent = "🔔 Reminder set"; rb.disabled = true; toast("We'll ping you when it starts. Keep this tab open.");
+    };
     $("#calBtn").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([icsFor(r, link)], { type: "text/calendar" })); a.download = (r.name || "room").replace(/[^\w -]/g, "") + ".ics"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); };
   }
   /* Keyboard shortcuts while watching */
@@ -734,6 +766,7 @@ function room(r, si, ss) {
     if (!$("#player") || /input|textarea|select/i.test(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (k === "f") goFull();
+    else if (k === "t") $("#theaterBtn")?.click();
     else if (k === "b") { const n = sourcesOf(r.items[idx]).length; if (n > 1) show(idx, (src + 1) % n); else toast("This stream has no backups"); }
     else if (k === "n") { if (r.items.length > 1) show((idx + 1) % r.items.length, 0); else toast("Only one stream in this room"); }
   };

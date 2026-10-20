@@ -10,7 +10,7 @@ Watch-party rooms: name a room, paste a stream link (YouTube videos and playlist
 The site lives at `https://<project>.pages.dev`. Every push to `main` redeploys it.
 
 Server functions (in `functions/api/`) run on Cloudflare:
-- `rooms` saves rooms so anyone with the site link sees them under **Open rooms**. Rooms delete themselves 48 hours after they end.
+- `rooms` saves rooms so anyone with the site link sees them. Rooms stay up until the owner deletes them.
 - `check` tests every link added to a room, pulls the playable video out of normal web pages, adds other playable videos from the page as backups, and moves links that won't play to the end.
 - `extract` lists the videos found in a page.
 - `stream` relays direct video links (.m3u8, .mp4, .mpd and so on) that the browser can't load on its own: plain `http://` links, servers that block other sites, and HLS playlists whose segments need the same treatment. The player tries each link directly first and only uses the relay if that fails.
