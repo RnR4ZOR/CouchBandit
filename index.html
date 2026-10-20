@@ -70,7 +70,7 @@ textarea{min-height:80px;resize:vertical}
 .player.full,.player:fullscreen{position:fixed;inset:0;z-index:40;width:100vw;height:100dvh;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
 .player:-webkit-full-screen{width:100%;height:100%;border:0;border-radius:0}
 .player .exitfs{position:absolute;right:calc(10px + env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));z-index:3;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:999px;padding:8px 14px;font:700 14px system-ui;cursor:pointer;display:none}
-.player.full .exitfs{display:block}
+.player.full .exitfs,.player:fullscreen .exitfs,.player:-webkit-full-screen .exitfs{display:block}
 .player .tapfs{position:absolute;inset:0;z-index:2;display:grid;place-items:center;background:rgba(0,0,0,.55);border:0;color:#fff;font:800 20px system-ui;cursor:pointer}
 body.lockscroll{overflow:hidden}
 .player .engine{position:absolute;left:12px;top:12px;font-size:12px;font-weight:700;background:rgba(0,0,0,.6);padding:4px 10px;border-radius:999px;color:var(--ink);pointer-events:none}
@@ -756,7 +756,7 @@ function room(r, si, ss) {
     const rb = $("#remindBtn");
     if (rb) rb.onclick = async () => {
       if (Notification.permission !== "granted" && (await Notification.requestPermission()) !== "granted") { toast("Allow notifications to get a reminder"); return; }
-      clearTimeout(remindT); remindT = setTimeout(() => { try { new Notification(r.name + " is starting", { body: "Your Couch Bandit room is live." }); } catch (e) {} }, Math.max(0, new Date(r.start) - Date.now()));
+      clearTimeout(remindT); const ping = () => { const ms = new Date(r.start) - Date.now(); if (ms > 2e9) { remindT = setTimeout(ping, 2e9); return; } remindT = setTimeout(() => { try { new Notification(r.name + " is starting", { body: "Your Couch Bandit room is live." }); } catch (e) {} }, Math.max(0, ms)); }; ping();
       rb.textContent = "🔔 Reminder set"; rb.disabled = true; toast("We'll ping you when it starts. Keep this tab open.");
     };
     $("#calBtn").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([icsFor(r, link)], { type: "text/calendar" })); a.download = (r.name || "room").replace(/[^\w -]/g, "") + ".ics"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); };
