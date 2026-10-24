@@ -31,5 +31,22 @@
         ]
       }
     ]
+  },
+  {
+    "id": "1f8lkree",
+    "created": 1792882526557,
+    "featured": false,
+    "name": "UFC 333 Prelims Replay",
+    "topic": "UFC 333 Prelims Replay",
+    "start": "",
+    "items": [
+      {
+        "title": "UFC 333 Prelims Replay",
+        "url": "https://dailywrestling.cc/embed/cfu/10-24-2026/select-post-1/8/1",
+        "backups": [
+          "https://dailywrestling.cc/embed/cfu/10-24-2026/select-post-1/6/1"
+        ]
+      }
+    ]
   }
 ]
