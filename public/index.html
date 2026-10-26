@@ -135,18 +135,18 @@ span.star{pointer-events:none}
   <a class="logo" href="#/"><b></b>Couch Bandit</a>
   <a class="l" href="#/">Rooms</a>
   <a class="l" href="#/new" id="addNav" hidden>Add room</a>
-  <button type="button" class="btn alt sm" id="ownerBtn">Owner login</button>
+  <button type="button" class="btn alt sm" id="ownerBtn">Master</button>
 </div></header>
 
 <main class="wrap" id="app"></main>
 
 <footer><div class="wrap">Couch Bandit · Watch together. No accounts, no tracking. Only share streams you have the right to share.</div></footer>
-<div class="modal" id="loginBox" hidden><form class="card" id="loginForm" autocomplete="off">
-  <h2>Owner login</h2>
-  <label>Username<input id="lg_user" required autocapitalize="off" spellcheck="false"></label>
-  <label>Password<input id="lg_pass" type="password" required></label>
+<div class="modal" id="loginBox" hidden><form class="card" id="loginForm">
+  <h2>Master</h2>
+  <input id="lg_user" type="text" value="master" autocomplete="username" readonly tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+  <label>Master code<input id="lg_pass" type="password" required autocomplete="current-password" autofocus></label>
   <p class="note" id="lg_msg" role="status"></p>
-  <div style="display:flex;gap:8px"><button class="btn" id="lg_go" type="submit">Log in</button><button type="button" class="btn alt" id="lg_cancel">Cancel</button></div>
+  <div style="display:flex;gap:8px"><button class="btn" id="lg_go" type="submit">Unlock</button><button type="button" class="btn alt" id="lg_cancel">Cancel</button></div>
 </form></div>
 <div class="modal" id="tokenBox" hidden><form class="card" id="tokenForm" autocomplete="off">
   <h2>Connect GitHub (one time)</h2>
@@ -455,21 +455,21 @@ async function login(user, pass) {
 }
 function logout() { setPass(""); isOwner = false; ownerPass = ""; ownerToken = ""; try { sessionStorage.removeItem("cb-owner"); } catch (e) {} paintNav(); route(); toast("Logged out"); }
 function paintNav() {
-  $("#ownerBtn").textContent = isOwner ? "Log out" : "Owner login";
+  $("#ownerBtn").textContent = isOwner ? "Log out" : "Master";
   $("#addNav").hidden = !isOwner;
 }
 function showLogin() {
-  const d = $("#loginBox"); d.hidden = false; $("#lg_user").value = ""; $("#lg_pass").value = ""; $("#lg_msg").textContent = ""; $("#lg_user").focus();
+  const d = $("#loginBox"); d.hidden = false; $("#lg_user").value = "master"; $("#lg_pass").value = ""; $("#lg_msg").textContent = ""; $("#lg_pass").focus();
 }
 $("#ownerBtn").onclick = () => isOwner ? logout() : showLogin();
 $("#lg_cancel").onclick = () => $("#loginBox").hidden = true;
 $("#loginForm").addEventListener("submit", async e => {
   e.preventDefault();
   const b = $("#lg_go"); b.disabled = true; $("#lg_msg").textContent = "Checking…";
-  const ok = await login($("#lg_user").value.trim(), $("#lg_pass").value);
+  const ok = await login("master", $("#lg_pass").value);
   b.disabled = false;
-  if (!ok) { $("#lg_msg").textContent = "That username or password isn't right."; return; }
-  $("#loginBox").hidden = true; paintNav(); route(); toast("Logged in as owner");
+  if (!ok) { $("#lg_msg").textContent = "That master code isn't right."; return; }
+  $("#loginBox").hidden = true; paintNav(); route(); toast("Unlocked — you're the master now");
 });
 
 const keepSave = list => { try { localStorage.setItem("cb-last-save", JSON.stringify({ at: Date.now(), list })); } catch (e) {} };
