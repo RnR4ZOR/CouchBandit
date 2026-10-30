@@ -143,6 +143,44 @@ span.star{pointer-events:none}
 .filters{display:flex;gap:6px;flex-wrap:wrap}
 .filters .chip{padding:6px 12px}
 [hidden]{display:none!important}
+.burger{display:inline-grid;gap:3px;margin-right:7px;vertical-align:middle}.burger i{display:block;width:13px;height:2px;border-radius:2px;background:currentColor}
+.ixscrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.45);opacity:0;transition:opacity .3s}
+.ixscrim.on{opacity:1}
+.ix{position:fixed;top:0;left:0;bottom:0;z-index:41;width:min(300px,86vw);background:var(--bg);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;overflow-x:hidden;
+  transform:translateX(-104%);transition:transform .38s cubic-bezier(.2,.8,.2,1),width .3s cubic-bezier(.2,.8,.2,1);box-shadow:20px 0 50px rgba(0,0,0,.25)}
+.ixgo .lv{width:8px;height:8px;border-radius:50%;background:#e5484d;box-shadow:0 0 0 3px color-mix(in srgb,#e5484d 25%,transparent);flex:none;margin-left:auto;animation:lvp 1.8s ease-in-out infinite}
+@keyframes lvp{50%{box-shadow:0 0 0 6px transparent}}
+.ixmini{display:none}
+/* Desktop: docked guide like Twitch/YouTube, collapsible to an icon rail */
+@media (min-width:1000px){
+  body.dock .ix{top:var(--hh,61px);transform:none;box-shadow:none;z-index:4;width:240px}
+  body.dock .ixscrim{display:none}
+  body.dock main,body.dock footer{padding-left:256px;transition:padding .3s cubic-bezier(.2,.8,.2,1)}
+  body.dock #ixClose{display:none}
+  body.dock .ixmini{display:inline-flex}
+  body.dock.rail .ix{width:68px}
+  body.dock.rail main,body.dock.rail footer{padding-left:84px}
+  body.dock.rail .ixgo{justify-content:center;gap:0}
+  body.dock.rail .ixgo :is(span,em),body.dock.rail .ixgo .t,body.dock.rail .ixlbl,body.dock.rail .ixtag{display:none}
+  body.dock.rail .ixgo .lv{position:absolute;margin:0;transform:translate(11px,-9px)}
+  body.dock.rail .ixgo{position:relative}
+  body.dock.rail .ixhead{justify-content:center}
+  body.dock.rail .ixmini{transform:rotate(180deg)}
+}
+.ix.on{transform:none}
+.ixhead{display:flex;justify-content:space-between;align-items:center}
+.ixtag{font:700 11px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.ixgrp{display:grid;gap:2px}.ixlbl{font:700 11px/1 ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 10px}
+.ixgo{display:flex;align-items:center;gap:12px;padding:11px 10px;border-radius:10px;color:inherit;text-decoration:none;font-weight:700;font-size:15px;background:none;border:0;cursor:pointer;text-align:left;width:100%;font-family:inherit;
+  transition:background .2s,transform .2s;opacity:0;transform:translateX(12px)}
+.ix.on .ixgo{opacity:1;transform:none;transition:background .2s,transform .35s cubic-bezier(.2,.8,.2,1) calc(var(--d,0)*30ms),opacity .35s calc(var(--d,0)*30ms)}
+.ixgo:hover,.ixgo:focus-visible{background:var(--surface)}
+.ixgo b{width:22px;text-align:center;color:var(--muted)}.ixgo em{margin-left:auto;font-style:normal;font-size:12px;color:var(--muted)}
+.ixgo.prime{border:1px solid var(--line)}.ixgo.prime b{color:inherit}
+.ixgo.out{margin-top:auto;color:var(--muted)}
+.ixrooms{display:grid;gap:2px;max-height:38vh;overflow-y:auto}
+.ixrooms .ixgo{font-weight:600;font-size:14px;padding:8px 10px}
+.ixrooms .ixgo span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -150,9 +188,25 @@ span.star{pointer-events:none}
 <header><div class="wrap nav">
   <a class="logo" href="#/"><b></b>Couch Bandit</a>
   <a class="l" href="#/">Rooms</a>
-  <a class="l" href="#/new" id="addNav" hidden>Add room</a>
+  <a class="l" href="#/new" id="addNav" hidden>+ Add room</a>
+  <button type="button" class="btn alt sm" id="menuBtn" hidden aria-expanded="false" aria-controls="ixMenu"><span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>Index</button>
   <button type="button" class="btn alt sm" id="ownerBtn">Master</button>
 </div></header>
+
+<div id="ixScrim" class="ixscrim" hidden></div>
+<nav id="ixMenu" class="ix" aria-label="Master index" aria-hidden="true">
+  <div class="ixhead"><span class="ixtag">Master index</span><button type="button" class="btn alt sm ixmini" id="ixRail" aria-label="Collapse sidebar" title="Collapse sidebar">«</button><button type="button" class="btn alt sm" id="ixClose" aria-label="Close index">✕</button></div>
+  <a class="ixgo prime" href="#/new" data-ix><b>+</b><span class="t">Add a room</span></a>
+  <div class="ixgrp"><span class="ixlbl">Jump to</span>
+    <a class="ixgo" href="#/" data-ix data-jump="top"><b>⌂</b><span class="t">Home</span></a>
+    <a class="ixgo" href="#/" data-ix data-jump="live"><b>●</b><span class="t">Live now</span><em id="ixLive"></em></a>
+    <a class="ixgo" href="#/" data-ix data-jump="soon"><b>◷</b><span class="t">Upcoming</span><em id="ixSoon"></em></a>
+    <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Featured</span><em id="ixFeat"></em></a>
+    <a class="ixgo" href="#/" data-ix data-jump="archiveSec"><b>▤</b><span class="t">Past events</span><em id="ixPast"></em></a>
+  </div>
+  <div class="ixgrp"><span class="ixlbl">Rooms</span><div id="ixRooms" class="ixrooms"></div></div>
+  <button type="button" class="ixgo out" id="ixLogout"><b>⏻</b><span class="t">Log out</span></button>
+</nav>
 
 <main class="wrap" id="app"></main>
 
@@ -470,10 +524,51 @@ async function login(user, pass) {
   return true;
 }
 function logout() { setPass(""); isOwner = false; ownerPass = ""; ownerToken = ""; try { sessionStorage.removeItem("cb-owner"); } catch (e) {} paintNav(); route(); toast("Logged out"); }
+const wide = matchMedia("(min-width:1000px)");
 function paintNav() {
-  $("#ownerBtn").textContent = isOwner ? "Log out" : "Master";
-  $("#addNav").hidden = !isOwner;
+  $("#ownerBtn").hidden = isOwner; $("#ownerBtn").textContent = "Master";
+  $("#addNav").hidden = !isOwner; $("#menuBtn").hidden = !isOwner || wide.matches;
+  document.body.classList.toggle("dock", isOwner && wide.matches);
+  let rail = false; try { rail = localStorage.getItem("cb-rail") === "1"; } catch (e) {} document.body.classList.toggle("rail", rail);
+  document.documentElement.style.setProperty("--hh", $("header").offsetHeight + "px");
+  if (isOwner && wide.matches) { ixFill(); ixOpen = false; $("#ixMenu").setAttribute("aria-hidden", "false"); $("#ixMenu").classList.add("on"); }
+  else if (!isOwner || !ixOpen) { $("#ixMenu").classList.remove("on"); $("#ixScrim").classList.remove("on"); $("#ixScrim").hidden = true; ixOpen = false; }
 }
+wide.addEventListener?.("change", () => paintNav());
+/* ===== Master index: slide-out menu for the owner — add a room, jump to any section or room, log out ===== */
+function ixFill() {
+  const n = (sel, v) => { $(sel).textContent = v ? v : ""; };
+  const act = ROOMS.filter(r => !isArchived(r));
+  n("#ixLive", act.filter(isLive).length); n("#ixSoon", act.filter(r => r.start && new Date(r.start) > new Date()).length);
+  n("#ixFeat", ROOMS.filter(r => r.featured).length); n("#ixPast", ROOMS.filter(isArchived).length);
+  $("#ixRooms").innerHTML = act.length ? sorted(act).map(r => `<a class="ixgo" href="${roomHref(r)}" data-ix title="${esc(r.name)}"><b>${r.featured ? "★" : esc(initials(r.name))}</b><span>${esc(r.name)}</span>${isLive(r) ? `<i class="lv" aria-label="live"></i>` : ""}</a>`).join("") : `<span class="note" style="padding:8px 10px">No current rooms</span>`;
+  [...$("#ixMenu").querySelectorAll(".ixgo")].forEach((a, i) => a.style.setProperty("--d", i));
+}
+let ixOpen = false;
+function ixShow(on) {
+  if (document.body.classList.contains("dock")) return; /* docked sidebar is always open on desktop */
+  ixOpen = on; const m = $("#ixMenu"), sc = $("#ixScrim");
+  $("#menuBtn").setAttribute("aria-expanded", on); m.setAttribute("aria-hidden", !on);
+  if (on) { ixFill(); sc.hidden = false; requestAnimationFrame(() => { sc.classList.add("on"); m.classList.add("on"); }); setTimeout(() => m.querySelector(".ixgo")?.focus(), 200); }
+  else { sc.classList.remove("on"); m.classList.remove("on"); setTimeout(() => { if (!ixOpen) sc.hidden = true; }, 300); }
+}
+$("#menuBtn").onclick = () => ixShow(!ixOpen);
+$("#ixRail").onclick = () => { const on = !document.body.classList.contains("rail"); document.body.classList.toggle("rail", on); $("#ixRail").setAttribute("aria-label", on ? "Expand sidebar" : "Collapse sidebar"); try { localStorage.setItem("cb-rail", on ? "1" : "0"); } catch (e) {} };
+$("#ixClose").onclick = () => ixShow(false);
+$("#ixScrim").onclick = () => ixShow(false);
+$("#ixLogout").onclick = () => { ixShow(false); logout(); };
+addEventListener("keydown", e => { if (e.key === "Escape" && ixOpen) { ixShow(false); $("#menuBtn").focus(); } });
+$("#ixMenu").addEventListener("click", e => {
+  const a = e.target.closest("[data-ix]"); if (!a) return; ixShow(false);
+  const j = a.dataset.jump; if (!j) return;
+  e.preventDefault();
+  const go = () => {
+    if (j === "top") return scrollTo({ top: 0, behavior: "smooth" });
+    if (j === "live" || j === "soon" || j === "featured") { const b = $(`#filters [data-filter="${j}"]`); if (b) b.click(); return $("#rooms")?.scrollIntoView({ behavior: "smooth" }); }
+    const el = $("#" + j); if (el && !el.hidden) { el.scrollIntoView({ behavior: "smooth" }); el.querySelector("details")?.setAttribute("open", ""); } else toast("Nothing filed there yet");
+  };
+  if (location.hash && location.hash !== "#/") { location.hash = "#/"; setTimeout(go, 350); } else go();
+});
 function showLogin() {
   const d = $("#loginBox"); d.hidden = false; $("#lg_user").value = "master"; $("#lg_pass").value = ""; $("#lg_msg").textContent = ""; $("#lg_pass").focus();
 }
@@ -622,7 +717,7 @@ function home() {
     const arc = $("#archiveList"); const old = ROOMS.filter(isArchived); $("#archiveSec").hidden = !old.length; arc.innerHTML = archiveHTML(old);
     const list = sorted(ROOMS).filter(r => !isArchived(r)).filter(pass).filter(r => !q || (r.name + " " + (r.topic || "")).toLowerCase().includes(q));
     box.innerHTML = list.length ? `<div class="rooms">${list.map(roomCard).join("")}</div>` : `<div class="empty">${q || f !== "all" ? "No rooms match that." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`; };
-  paint(); loadRooms().then(paint);
+  paint(); loadRooms().then(() => { paint(); if (isOwner) ixFill(); });
   /* keep the list fresh while friends sit on the home page: every 90 seconds, and when they come back to the tab */
   clearInterval(liveT); liveT = setInterval(() => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); }, 90e3);
   onvisibilitychange = () => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); };
@@ -833,7 +928,7 @@ async function route() {
     room(byId(decodeURIComponent(id)), si, ss);
   }
   else if (h.startsWith("#/room/")) { const [code, si, ss] = h.slice(7).split("/"); room(dec(code), si, ss); }
-  else if (h === "#/new") newRoom();
+  else if (h === "#/new") { if (isOwner) newRoom(); else { home(); showLogin(); } }
   else home();
   window.scrollTo(0, 0);
 }
