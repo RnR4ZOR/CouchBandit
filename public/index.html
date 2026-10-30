@@ -60,6 +60,22 @@ textarea{min-height:80px;resize:vertical}
 .room .meta span{font-size:13px;color:var(--muted)}
 .empty{border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--muted);text-align:center}
 .secthead{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.files{display:grid;gap:10px}
+.file{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--line) 12%,transparent);transition:border-color .25s}
+.file[open]{border-color:color-mix(in srgb,var(--line) 40%,currentColor)}
+.file summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 16px}
+.file summary::-webkit-details-marker{display:none}
+.file .tab{font:600 11px/1 ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;padding:7px 9px;border-radius:8px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.file .ev{display:grid;gap:3px;min-width:0}.file .ev b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file .ev span{color:var(--muted);font-size:13px}
+.file .chev{transition:transform .3s cubic-bezier(.2,.8,.2,1);color:var(--muted)}.file[open] .chev{transform:rotate(90deg)}
+.file .segs{display:grid;padding:0 16px 14px;animation:fileIn .35s cubic-bezier(.2,.8,.2,1)}
+.seg{display:grid;grid-template-columns:110px 1fr auto;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--line);color:inherit;text-decoration:none;transition:padding .2s}
+.seg:hover{padding-left:6px}.seg i{font-style:normal;font:600 11px/1 ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.seg .when{color:var(--muted);font-size:13px;white-space:nowrap}
+@keyframes fileIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (max-width:560px){.seg{grid-template-columns:1fr auto}.seg i{grid-column:1/-1}}
+@media (prefers-reduced-motion:reduce){.file .segs{animation:none}.seg,.file .chev{transition:none}}
 /* room view */
 .stage{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
 @media(max-width:960px){.stage{grid-template-columns:1fr}}
@@ -550,6 +566,28 @@ document.addEventListener("click", async e => {
 });
 
 /* ===== Pages ===== */
+/* ===== Past events: a room older than 3 days (by its start time, else when it was added) is filed away.
+   Events are grouped and listed newest to oldest; inside each, Main card first, then Prelims, then Early prelims. ===== */
+const roomTime = r => (r.start && !isNaN(new Date(r.start))) ? new Date(r.start).getTime() : (+r.created || Date.now());
+const isArchived = r => Date.now() - roomTime(r) > 72 * HOUR;
+const SEG_RE = /\b(early\s*prelim(?:inarie)?s?|prelim(?:inarie)?s?|main\s*card|main\s*event)\b/i;
+const segRank = t => { const m = String(t || "").match(SEG_RE); if (!m) return 3; const k = m[1].toLowerCase(); return k.startsWith("early") ? 2 : k.startsWith("prelim") ? 1 : 0; };
+const SEG_NAME = ["Main card", "Prelims", "Early prelims", "Stream"];
+const eventName = r => String(r.name || "Event").replace(SEG_RE, "").replace(/[\s\-–—:|·]+$/,"").replace(/^[\s\-–—:|·]+/,"").trim() || r.name || "Event";
+const roomSeg = r => Math.min(segRank(r.name), segRank(r.topic), ...(r.items || []).map(i => segRank(i.title)));
+function archiveHTML(old) {
+  const groups = new Map();
+  for (const r of old) { const day = new Date(roomTime(r)).toDateString(), key = eventName(r).toLowerCase() + "|" + day;
+    if (!groups.has(key)) groups.set(key, { name: eventName(r), t: roomTime(r), rooms: [] });
+    const g = groups.get(key); g.rooms.push(r); g.t = Math.max(g.t, roomTime(r)); }
+  const fmtD = t => new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  const fmtT = t => new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return [...groups.values()].sort((a, b) => b.t - a.t).map(g => {
+    const rows = g.rooms.sort((a, b) => roomSeg(a) - roomSeg(b) || roomTime(b) - roomTime(a)).map(r =>
+      `<a class="seg" href="${roomHref(r)}"><i>${SEG_NAME[roomSeg(r)]}</i><b>${esc(r.name)}</b><span class="when">${fmtT(roomTime(r))}</span></a>`).join("");
+    return `<details class="file"><summary><span class="tab">${new Date(g.t).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}</span><span class="ev"><b>${esc(g.name)}</b><span>${fmtD(g.t)} · ${fmtT(g.t)} · ${g.rooms.length} stream${g.rooms.length > 1 ? "s" : ""}</span></span><span class="chev" aria-hidden="true">›</span></summary><div class="segs">${rows}</div></details>`;
+  }).join("");
+}
 function home() {
   app.innerHTML = `
   <section class="hero solo">
@@ -570,6 +608,10 @@ function home() {
   <section id="rooms">
     <div class="secthead"><h2>All rooms</h2><div class="tools"><div class="filters" id="filters" role="group" aria-label="Filter rooms"><button type="button" class="chip" data-filter="all" aria-pressed="true">All</button><button type="button" class="chip" data-filter="live" aria-pressed="false">Live</button><button type="button" class="chip" data-filter="soon" aria-pressed="false">Upcoming</button><button type="button" class="chip" data-filter="featured" aria-pressed="false">Featured</button></div><input id="roomSearch" type="search" placeholder="Search rooms" aria-label="Search rooms">${isOwner ? `<span class="note">☆ features a room (tap again to unfeature), ✕ deletes it</span>` : ""}</div></div>
     <div id="roomList"><div class="empty">Loading rooms…</div></div>
+  </section>
+  <section id="archiveSec" hidden>
+    <div class="secthead"><h2>Past events</h2><span class="note">Filed after 3 days, newest first</span></div>
+    <div id="archiveList" class="files"></div>
   </section>`;
   const paint = () => { const box = $("#roomList"); if (!box) return;
     const feat = ROOMS.filter(r => r.featured); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
@@ -577,7 +619,8 @@ function home() {
     const q = ($("#roomSearch")?.value || "").trim().toLowerCase();
     const f = $("#filters [aria-pressed='true']")?.dataset.filter || "all";
     const pass = r => f === "all" || (f === "live" && isLive(r)) || (f === "soon" && r.start && new Date(r.start) > new Date()) || (f === "featured" && r.featured);
-    const list = sorted(ROOMS).filter(pass).filter(r => !q || (r.name + " " + (r.topic || "")).toLowerCase().includes(q));
+    const arc = $("#archiveList"); const old = ROOMS.filter(isArchived); $("#archiveSec").hidden = !old.length; arc.innerHTML = archiveHTML(old);
+    const list = sorted(ROOMS).filter(r => !isArchived(r)).filter(pass).filter(r => !q || (r.name + " " + (r.topic || "")).toLowerCase().includes(q));
     box.innerHTML = list.length ? `<div class="rooms">${list.map(roomCard).join("")}</div>` : `<div class="empty">${q || f !== "all" ? "No rooms match that." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`; };
   paint(); loadRooms().then(paint);
   /* keep the list fresh while friends sit on the home page: every 90 seconds, and when they come back to the tab */
