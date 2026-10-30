@@ -65,6 +65,7 @@ textarea{min-height:80px;resize:vertical}
 .cattag{background:var(--accent);color:var(--accent-ink);border-radius:3px;padding:0 5px;margin-right:6px;font-weight:800}
 @keyframes catIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.catgrp{animation:none}}
+.ix [hidden]{display:none!important}
 .empty{border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--muted);text-align:center}
 .secthead{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .files{display:grid;gap:10px}
@@ -202,8 +203,8 @@ span.star{pointer-events:none}
 
 <div id="ixScrim" class="ixscrim" hidden></div>
 <nav id="ixMenu" class="ix" aria-label="Master index" aria-hidden="true">
-  <div class="ixhead"><span class="ixtag">Master index</span><button type="button" class="btn alt sm ixmini" id="ixRail" aria-label="Collapse sidebar" title="Collapse sidebar">«</button><button type="button" class="btn alt sm" id="ixClose" aria-label="Close index">✕</button></div>
-  <a class="ixgo prime" href="#/new" data-ix><b>+</b><span class="t">Add a room</span></a>
+  <div class="ixhead"><span class="ixtag" id="ixTag">Index</span><button type="button" class="btn alt sm ixmini" id="ixRail" aria-label="Collapse sidebar" title="Collapse sidebar">«</button><button type="button" class="btn alt sm" id="ixClose" aria-label="Close index">✕</button></div>
+  <a class="ixgo prime" href="#/new" data-ix id="ixAdd" hidden><b>+</b><span class="t">Add a room</span></a>
   <div class="ixgrp"><span class="ixlbl">Jump to</span>
     <a class="ixgo" href="#/" data-ix data-jump="top"><b>⌂</b><span class="t">Home</span></a>
     <a class="ixgo" href="#/" data-ix data-jump="live"><b>●</b><span class="t">Live now</span><em id="ixLive"></em></a>
@@ -211,6 +212,7 @@ span.star{pointer-events:none}
     <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Featured</span><em id="ixFeat"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="archiveSec"><b>▤</b><span class="t">Past events</span><em id="ixPast"></em></a>
   </div>
+  <div class="ixgrp" id="ixCatGrp" hidden><span class="ixlbl">Sports</span><div id="ixCats"></div></div>
   <div class="ixgrp"><span class="ixlbl">Rooms</span><div id="ixRooms" class="ixrooms"></div></div>
   <button type="button" class="ixgo out" id="ixLogout"><b>⏻</b><span class="t">Log out</span></button>
 </nav>
@@ -455,6 +457,7 @@ function startLabel(start) {
   if (t <= now) return "Started";
   return t.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
+let catSel = "all";
 const CATS = ["UFC", "ONE", "Boxing", "AFL", "NBA", "NFL", "Tennis"];
 const catOf = r => r.cat || "Other";
 const catOrder = c => { const i = CATS.indexOf(c); return i < 0 ? (c === "Other" ? 99 : 50) : i; };
@@ -539,12 +542,14 @@ function logout() { setPass(""); isOwner = false; ownerPass = ""; ownerToken = "
 const wide = matchMedia("(min-width:1000px)");
 function paintNav() {
   $("#ownerBtn").hidden = isOwner; $("#ownerBtn").textContent = "Master";
-  $("#addNav").hidden = !isOwner; $("#menuBtn").hidden = !isOwner || wide.matches;
-  document.body.classList.toggle("dock", isOwner && wide.matches);
+  $("#addNav").hidden = !isOwner; $("#menuBtn").hidden = wide.matches;
+  document.body.classList.toggle("dock", wide.matches);
+  /* everyone gets the index; only the owner sees add-room and log out */
+  $("#ixAdd").hidden = $("#ixLogout").hidden = !isOwner; $("#ixTag").textContent = isOwner ? "Master index" : "Index";
   let rail = false; try { rail = localStorage.getItem("cb-rail") === "1"; } catch (e) {} document.body.classList.toggle("rail", rail);
   document.documentElement.style.setProperty("--hh", $("header").offsetHeight + "px");
-  if (isOwner && wide.matches) { ixFill(); ixOpen = false; $("#ixMenu").setAttribute("aria-hidden", "false"); $("#ixMenu").classList.add("on"); }
-  else if (!isOwner || !ixOpen) { $("#ixMenu").classList.remove("on"); $("#ixScrim").classList.remove("on"); $("#ixScrim").hidden = true; ixOpen = false; }
+  if (wide.matches) { ixFill(); ixOpen = false; $("#ixMenu").setAttribute("aria-hidden", "false"); $("#ixMenu").classList.add("on"); }
+  else if (!ixOpen) { $("#ixMenu").classList.remove("on"); $("#ixScrim").classList.remove("on"); $("#ixScrim").hidden = true; ixOpen = false; }
 }
 wide.addEventListener?.("change", () => paintNav());
 /* ===== Master index: slide-out menu for the owner — add a room, jump to any section or room, log out ===== */
@@ -554,6 +559,9 @@ function ixFill() {
   n("#ixLive", act.filter(isLive).length); n("#ixSoon", act.filter(r => r.start && new Date(r.start) > new Date()).length);
   n("#ixFeat", ROOMS.filter(r => r.featured).length); n("#ixPast", ROOMS.filter(isArchived).length);
   $("#ixRooms").innerHTML = act.length ? sorted(act).map(r => `<a class="ixgo" href="${roomHref(r)}" data-ix title="${esc(r.name)}"><b>${r.featured ? "★" : esc(initials(r.name))}</b><span>${esc(r.name)}</span>${isLive(r) ? `<i class="lv" aria-label="live"></i>` : ""}</a>`).join("") : `<span class="note" style="padding:8px 10px">No current rooms</span>`;
+  const cats = [...new Set(act.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
+  $("#ixCatGrp").hidden = !(cats.length > 1 || (cats[0] && cats[0] !== "Other"));
+  $("#ixCats").innerHTML = cats.map(c => `<a class="ixgo" href="#/" data-ix data-cat-jump="${esc(c)}"><b>${esc(c.slice(0, 2).toUpperCase())}</b><span class="t">${esc(c === "Other" ? "Other rooms" : c)}</span><em>${act.filter(r => catOf(r) === c).length}</em></a>`).join("");
   [...$("#ixMenu").querySelectorAll(".ixgo")].forEach((a, i) => a.style.setProperty("--d", i));
 }
 let ixOpen = false;
@@ -572,6 +580,7 @@ $("#ixLogout").onclick = () => { ixShow(false); logout(); };
 addEventListener("keydown", e => { if (e.key === "Escape" && ixOpen) { ixShow(false); $("#menuBtn").focus(); } });
 $("#ixMenu").addEventListener("click", e => {
   const a = e.target.closest("[data-ix]"); if (!a) return; ixShow(false);
+  if (a.dataset.catJump) { e.preventDefault(); catSel = a.dataset.catJump; const goCat = () => { const b = $(`#cats [data-cat="${CSS.escape(catSel)}"]`); if (b) b.click(); $("#rooms")?.scrollIntoView({ behavior: "smooth" }); }; if ($("#roomList")) goCat(); else { location.hash = "#/"; setTimeout(goCat, 300); } return; }
   const j = a.dataset.jump; if (!j) return;
   e.preventDefault();
   const go = () => {
@@ -695,7 +704,6 @@ function archiveHTML(old) {
     return `<details class="file"><summary><span class="tab">${new Date(g.t).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}</span><span class="ev"><b>${esc(g.name)}</b><span>${fmtD(g.t)} · ${fmtT(g.t)} · ${g.rooms.length} stream${g.rooms.length > 1 ? "s" : ""}</span></span><span class="chev" aria-hidden="true">›</span></summary><div class="segs">${rows}</div></details>`;
   }).join("");
 }
-let catSel = "all";
 function home() {
   app.innerHTML = `
   <section class="hero solo">
@@ -732,13 +740,13 @@ function home() {
     const cur = ROOMS.filter(r => !isArchived(r)), cats = [...new Set(cur.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
     if (!cats.includes(catSel)) catSel = "all";
     $("#cats").hidden = cats.length < 2 && cats[0] === "Other";
-    $("#cats").innerHTML = ["all", ...cats].map(c => `<button type="button" class="chip" data-cat="${esc(c)}" aria-pressed="${c === catSel}">${c === "all" ? "All sports" : esc(c)}<small>${c === "all" ? cur.length : cur.filter(r => catOf(r) === c).length} rooms</small></button>`).join("");
+    $("#cats").innerHTML = ["all", ...cats].map(c => `<button type="button" class="chip" data-cat="${esc(c)}" aria-pressed="${c === catSel}">${c === "all" ? "All sports" : esc(c)}<small>${(n => n + (n === 1 ? " room" : " rooms"))(c === "all" ? cur.length : cur.filter(r => catOf(r) === c).length)}</small></button>`).join("");
     const list = sorted(cur).filter(pass).filter(r => catSel === "all" || catOf(r) === catSel).filter(r => !q || (r.name + " " + (r.topic || "") + " " + catOf(r)).toLowerCase().includes(q));
     const groups = catSel === "all" && cats.length > 1 ? cats.map(c => [c, list.filter(r => catOf(r) === c)]).filter(g => g[1].length) : null;
     box.innerHTML = !list.length ? `<div class="empty">${q || f !== "all" || catSel !== "all" ? "No rooms match that." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`
       : groups ? groups.map(([c, rs]) => `<div class="catgrp"><h3 class="cathead">${esc(c === "Other" ? "Other rooms" : c)}<span>${rs.length}</span></h3><div class="rooms">${rs.map(roomCard).join("")}</div></div>`).join("")
       : `<div class="rooms">${list.map(roomCard).join("")}</div>`; };
-  paint(); loadRooms().then(() => { paint(); if (isOwner) ixFill(); });
+  paint(); loadRooms().then(() => { paint(); ixFill(); });
   /* keep the list fresh while friends sit on the home page: every 90 seconds, and when they come back to the tab */
   clearInterval(liveT); liveT = setInterval(() => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); }, 90e3);
   onvisibilitychange = () => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); };
