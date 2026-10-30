@@ -47,3 +47,6 @@ Every push to `main` that changes `public/` runs **Deploy to GitHub Pages** (`.g
 - Delete an auto room and it won't come back. Edit one and it becomes yours, so the sync stops changing it.
 - Add or remove channels by editing `tools/channels.json`. The Actions log lists any handle it couldn't read.
 - Run it now: **Actions → Event sync → Run workflow**.
+
+## Event requests
+Anyone can tap **Request event**. The event's name, date/time, league and venue are filled in straight away (TheSportsDB), and the hourly event sync looks for it on the official channels only. If it finds a stream, a ready-made room (up to 5 backups) waits on the **Requests** page for the owner to approve. If not, the owner can paste their own links there; pages, embed code and video links are checked and turned into embeds, same as any room.

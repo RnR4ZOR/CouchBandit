@@ -1,12 +1,13 @@
-# Every 3 hours: finds scheduled live streams on the official channels in tools/channels.json
+# Every hour: finds scheduled live streams on the official channels in tools/channels.json
 # and adds/updates them as categorised event rooms on Couch Bandit (max 5 backups each).
 #
 # Uses the OWNER_PASS secret you already have. Optional secrets:
 #   YT_API_KEY  free YouTube Data API key (more reliable than reading the public pages)
+#   SPORTSDB_KEY  TheSportsDB key for event details (free test key used if unset)
 #   SITE_URL    defaults to https://couchbandit.pages.dev
 name: Event sync
 on:
-  schedule: [{ cron: "17 */3 * * *" }]
+  schedule: [{ cron: "17 * * * *" }]
   workflow_dispatch:
 concurrency: { group: event-sync, cancel-in-progress: true }
 jobs:
@@ -22,4 +23,5 @@ jobs:
           SITE: ${{ secrets.SITE_URL || 'https://couchbandit.pages.dev' }}
           SYNC_KEY: ${{ secrets.OWNER_PASS }}
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
+          SPORTSDB_KEY: ${{ secrets.SPORTSDB_KEY }}
         run: node tools/events-sync.mjs
