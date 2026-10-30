@@ -39,3 +39,11 @@ The first time you open the Cloudflare site it shows the rooms from `rooms.json`
 
 ## Automatic deploy to GitHub Pages
 Every push to `main` that changes `public/` runs **Deploy to GitHub Pages** (`.github/workflows/deploy-pages.yml`). It copies `public/` to the `gh-pages` branch, which serves https://rnr4zor.github.io/CouchBandit/. The live `rooms.json` is kept, so rooms saved on the site aren't overwritten. To redeploy by hand: **Actions → Deploy to GitHub Pages → Run workflow**.
+
+## Auto event rooms (official channels)
+`.github/workflows/events-sync.yml` runs every 3 hours. It reads the official channels in `tools/channels.json`, finds their scheduled and live streams for the next 14 days, and adds each as a room with its sport category, start time and up to 5 backups (the same event on other official channels, plus any `alts` you list). Rooms are grouped by sport on the home page, show a countdown before they start, and are filed into Past events after 3 days.
+
+- Uses the `OWNER_PASS` secret you already have. Optional: `YT_API_KEY` (free YouTube Data API key, more reliable) and `SITE_URL` (defaults to https://couchbandit.pages.dev).
+- Delete an auto room and it won't come back. Edit one and it becomes yours, so the sync stops changing it.
+- Add or remove channels by editing `tools/channels.json`. The Actions log lists any handle it couldn't read.
+- Run it now: **Actions → Event sync → Run workflow**.
