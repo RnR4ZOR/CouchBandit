@@ -65,7 +65,19 @@ textarea{min-height:80px;resize:vertical}
 .cattag{background:var(--accent);color:var(--accent-ink);border-radius:3px;padding:0 5px;margin-right:6px;font-weight:800}
 @keyframes catIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.catgrp{animation:none}}
-.ix [hidden]{display:none!important}
+.ix [hidden],.nav [hidden]{display:none!important}
+.reqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.req{align-content:start;animation:catIn .35s cubic-bezier(.2,.8,.2,1) both}
+.req h3{font-size:24px}
+.reqtop{display:flex;gap:8px;align-items:center}
+.pill{font:700 11px var(--body);letter-spacing:.05em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--line)}
+.pill.good{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,transparent)}
+.pill.soon{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.pill.bad{color:var(--coral);border-color:color-mix(in srgb,var(--coral) 45%,transparent)}
+.reqinfo{display:grid;gap:6px;margin:0}.reqinfo div{display:grid;grid-template-columns:80px 1fr;gap:8px}
+.reqinfo dt{font:700 11px var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:2px}.reqinfo dd{margin:0}
+.reqown{display:grid;gap:10px;border-top:1px dashed var(--line);padding-top:12px}
+.reqown summary{cursor:pointer}
 .empty{border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--muted);text-align:center}
 .secthead{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .files{display:grid;gap:10px}
@@ -197,6 +209,7 @@ span.star{pointer-events:none}
   <a class="logo" href="#/"><b></b>Couch Bandit</a>
   <a class="l" href="#/">Rooms</a>
   <a class="l" href="#/new" id="addNav" hidden>+ Add room</a>
+  <button type="button" class="btn alt sm" id="reqBtn" hidden>Request event</button>
   <button type="button" class="btn alt sm" id="menuBtn" hidden aria-expanded="false" aria-controls="ixMenu"><span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>Index</button>
   <button type="button" class="btn alt sm" id="ownerBtn">Master</button>
 </div></header>
@@ -212,6 +225,7 @@ span.star{pointer-events:none}
     <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Featured</span><em id="ixFeat"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="archiveSec"><b>▤</b><span class="t">Past events</span><em id="ixPast"></em></a>
   </div>
+  <a class="ixgo" href="#/requests" data-ix id="ixReq" hidden><b>✦</b><span class="t">Requests</span><em id="ixReqN"></em></a>
   <div class="ixgrp" id="ixCatGrp" hidden><span class="ixlbl">Sports</span><div id="ixCats"></div></div>
   <div class="ixgrp"><span class="ixlbl">Rooms</span><div id="ixRooms" class="ixrooms"></div></div>
   <button type="button" class="ixgo out" id="ixLogout"><b>⏻</b><span class="t">Log out</span></button>
@@ -232,6 +246,15 @@ span.star{pointer-events:none}
   <p class="note">Saving rooms for everyone needs your GitHub key. It's locked with your owner password and kept only on this device.</p>
   <label>GitHub key<input id="tk_val" type="password" required placeholder="github_pat_..."></label>
   <div style="display:flex;gap:8px"><button class="btn" type="submit">Save key</button><button type="button" class="btn alt" id="tk_cancel">Cancel</button></div>
+</form></div>
+<div class="modal" id="reqBox" hidden><form class="card" id="reqForm" autocomplete="off">
+  <h3>Request an event</h3>
+  <p class="note">Name it and we'll fill in the details and look for an official stream.</p>
+  <label>Event<input id="rq_text" required minlength="3" maxlength="80" placeholder="UFC 323, Crows vs Power, Lakers vs Celtics…"></label>
+  <div class="two"><label>Sport<select id="rq_cat"><option value="">Not sure</option></select></label><label>When (if you know)<input id="rq_when" type="datetime-local"></label></div>
+  <label>Anything else (optional)<input id="rq_extra" maxlength="200" placeholder="Main card only, prelims too…"></label>
+  <p class="note" id="rq_msg" role="status"></p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="submit" id="rq_go">Send request</button><button type="button" class="btn alt" id="rq_cancel">Cancel</button><a class="btn alt" href="#/requests" id="rq_board">See requests</a></div>
 </form></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -545,7 +568,8 @@ function paintNav() {
   $("#addNav").hidden = !isOwner; $("#menuBtn").hidden = wide.matches;
   document.body.classList.toggle("dock", wide.matches);
   /* everyone gets the index; only the owner sees add-room and log out */
-  $("#ixAdd").hidden = $("#ixLogout").hidden = !isOwner; $("#ixTag").textContent = isOwner ? "Master index" : "Index";
+  $("#ixAdd").hidden = $("#ixLogout").hidden = !isOwner;
+  $("#reqBtn").hidden = $("#ixReq").hidden = !SERVER_ON; $("#ixTag").textContent = isOwner ? "Master index" : "Index";
   let rail = false; try { rail = localStorage.getItem("cb-rail") === "1"; } catch (e) {} document.body.classList.toggle("rail", rail);
   document.documentElement.style.setProperty("--hh", $("header").offsetHeight + "px");
   if (wide.matches) { ixFill(); ixOpen = false; $("#ixMenu").setAttribute("aria-hidden", "false"); $("#ixMenu").classList.add("on"); }
@@ -559,6 +583,7 @@ function ixFill() {
   n("#ixLive", act.filter(isLive).length); n("#ixSoon", act.filter(r => r.start && new Date(r.start) > new Date()).length);
   n("#ixFeat", ROOMS.filter(r => r.featured).length); n("#ixPast", ROOMS.filter(isArchived).length);
   $("#ixRooms").innerHTML = act.length ? sorted(act).map(r => `<a class="ixgo" href="${roomHref(r)}" data-ix title="${esc(r.name)}"><b>${r.featured ? "★" : esc(initials(r.name))}</b><span>${esc(r.name)}</span>${isLive(r) ? `<i class="lv" aria-label="live"></i>` : ""}</a>`).join("") : `<span class="note" style="padding:8px 10px">No current rooms</span>`;
+  loadReqs().then(l => n("#ixReqN", (l || []).filter(q => !["done", "declined"].includes(q.status)).length));
   const cats = [...new Set(act.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
   $("#ixCatGrp").hidden = !(cats.length > 1 || (cats[0] && cats[0] !== "Other"));
   $("#ixCats").innerHTML = cats.map(c => `<a class="ixgo" href="#/" data-ix data-cat-jump="${esc(c)}"><b>${esc(c.slice(0, 2).toUpperCase())}</b><span class="t">${esc(c === "Other" ? "Other rooms" : c)}</span><em>${act.filter(r => catOf(r) === c).length}</em></a>`).join("");
@@ -951,6 +976,86 @@ function room(r, si, ss) {
   };
 }
 
+/* ===== Event requests: anyone asks for an event; details are filled in automatically and the event sync looks for an
+   official stream. Found ones arrive as a ready room for the owner to approve; otherwise the owner can paste links,
+   which are checked and turned into embeds like any other room. ===== */
+let REQS = [];
+const reqHdr = () => getPass() ? { Authorization: "Bearer " + getPass() } : {};
+async function loadReqs() { try { const r = await fetch("api/requests", { cache: "no-store", headers: reqHdr() }); if (r.ok) REQS = await r.json(); } catch (e) {} return REQS; }
+const REQ_LABEL = { new: ["Searching", "soon"], found: ["Official stream found", "good"], info: ["Details ready · no official stream yet", "soon"], none: ["Not found yet", "bad"], done: ["Room ready", "good"], declined: ["Declined", "bad"] };
+const fmtWhen = st => st && !isNaN(new Date(st)) ? new Date(st).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "Time not announced";
+function openReq() {
+  const d = $("#reqBox"); d.hidden = false; $("#rq_msg").textContent = ""; $("#rq_text").focus();
+  $("#rq_cat").innerHTML = `<option value="">Not sure</option>` + CATS.map(c => `<option>${c}</option>`).join("");
+}
+$("#reqBtn").onclick = openReq;
+$("#rq_cancel").onclick = () => $("#reqBox").hidden = true;
+$("#rq_board").onclick = () => $("#reqBox").hidden = true;
+$("#reqForm").onsubmit = async e => {
+  e.preventDefault(); const go = $("#rq_go"); go.disabled = true; go.textContent = "Looking it up…";
+  try {
+    const when = $("#rq_when").value;
+    const r = await fetch("api/requests", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: $("#rq_text").value, cat: $("#rq_cat").value, when: when ? new Date(when).toISOString() : "", extra: $("#rq_extra").value }) });
+    const j = await r.json();
+    if (!r.ok) { $("#rq_msg").textContent = j.error || "Couldn't send that. Try again."; return; }
+    const i = j.request.info || {};
+    $("#rq_msg").textContent = (j.duplicate ? "Already requested: " : "Got it: ") + (i.name || j.request.text) + (i.cat ? " · " + i.cat : "") + " · " + fmtWhen(i.start);
+    $("#rq_text").value = $("#rq_extra").value = $("#rq_when").value = "";
+    if (location.hash === "#/requests") requestsPage();
+  } catch (err) { $("#rq_msg").textContent = "Couldn't reach the site. Check your connection."; }
+  finally { go.disabled = false; go.textContent = "Send request"; }
+};
+async function patchReq(body) { const r = await fetch("api/requests", { method: "PATCH", headers: { "content-type": "application/json", ...reqHdr() }, body: JSON.stringify(body) }); return r.ok; }
+function reqCard(q) {
+  const i = q.info || {}, [lab, tone] = REQ_LABEL[q.status] || ["Pending", "soon"], open = !["done", "declined"].includes(q.status);
+  const room = q.roomId && byId(q.roomId);
+  const draft = q.draft && q.draft.items ? q.draft.items[0] : null;
+  const ownerBox = !isOwner || !open ? "" : `<div class="reqown" data-req="${esc(q.id)}">
+      ${draft ? `<p class="note">Official stream: ${esc(draft.url)}${draft.backups.length ? ` + ${draft.backups.length} backup${draft.backups.length > 1 ? "s" : ""}` : ""}</p><button type="button" class="btn sm" data-approve>Approve room</button>` : ""}
+      <details${draft ? "" : " open"}><summary class="note">${draft ? "Or use your own links" : "Add links (pages, embed code or video links are turned into embeds)"}</summary>
+        <div style="display:grid;gap:8px;margin-top:8px"><input data-l placeholder="Main link or embed code">${[1, 2, 3, 4, 5].map(k => `<input data-l placeholder="Backup ${k} (optional)">`).join("")}
+        <button type="button" class="btn sm" data-make>Make room</button></div></details>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt sm" data-decline>Decline</button><button type="button" class="btn alt sm" data-del>Delete</button></div></div>`;
+  return `<article class="req card">
+    <div class="reqtop"><span class="pill ${tone}">${esc(lab)}</span>${i.cat || q.cat ? `<b class="cattag">${esc(i.cat || q.cat)}</b>` : ""}</div>
+    <h3>${esc(i.name || q.text)}</h3>
+    <dl class="reqinfo"><div><dt>When</dt><dd>${esc(fmtWhen(i.start))}</dd></div>${i.league ? `<div><dt>League</dt><dd>${esc(i.league)}</dd></div>` : ""}${i.venue ? `<div><dt>Venue</dt><dd>${esc(i.venue)}</dd></div>` : ""}<div><dt>Asked for</dt><dd>${esc(q.text)}${q.extra && isOwner ? " · " + esc(q.extra) : ""}</dd></div></dl>
+    ${q.note ? `<p class="note">${esc(q.note)}</p>` : ""}
+    ${room ? `<a class="btn sm" href="${roomHref(room)}">Open room</a>` : ""}${ownerBox}</article>`;
+}
+async function requestsPage() {
+  app.innerHTML = `<section style="display:grid;gap:16px"><a href="#/" class="note">← All rooms</a>
+    <div class="secthead" style="margin:0"><h2>Event requests</h2><button type="button" class="btn sm" id="reqNew">+ Request an event</button></div>
+    <p class="sub">Ask for any event. Details fill in automatically, and official free streams are added as rooms when they're found.</p>
+    <div id="reqList" class="reqs"><div class="empty">Loading requests…</div></div></section>`;
+  $("#reqNew").onclick = openReq;
+  await Promise.all([loadReqs(), ROOMS.length ? 0 : loadRooms()]);
+  const box = $("#reqList"); if (!box) return;
+  const order = { found: 0, new: 1, info: 2, none: 3, done: 4, declined: 5 };
+  const list = [...REQS].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || b.created - a.created).filter(q => isOwner || q.status !== "declined");
+  box.innerHTML = list.length ? list.map(reqCard).join("") : `<div class="empty">No requests yet. Be the first.</div>`;
+  if (isOwner) ixFill();
+}
+document.addEventListener("click", async e => {
+  const own = e.target.closest("[data-req]"); if (!own || !isOwner) return;
+  const q = REQS.find(x => x.id === own.dataset.req); if (!q) return;
+  const b = e.target.closest("button"); if (!b) return;
+  const i = q.info || {};
+  const addRoom = async nr => { if (await saveRooms(list => list.some(x => x.id === nr.id) ? list : [...list, nr], "Add requested room: " + nr.name)) { await patchReq({ id: q.id, status: "done", roomId: nr.id, note: "Room is up." }); location.hash = "#/r/" + encodeURIComponent(nr.id); } };
+  if (b.matches("[data-approve]")) { b.disabled = true; const d = { ...q.draft, id: q.draft.id || newId(), created: Date.now() }; delete d.auto; await addRoom(d); b.disabled = false; }
+  else if (b.matches("[data-make]")) {
+    const links = [...own.querySelectorAll("[data-l]")].map(x => cleanLink(x.value)).filter(Boolean);
+    if (!links.length) return toast("Paste at least a main link");
+    const bad = links.find(u => parse(u).kind === "bad"); if (bad) return toast("This link isn't valid: " + bad.slice(0, 50), 6000);
+    b.disabled = true; b.textContent = "Checking links…";
+    const items = [{ title: "Stream", url: links[0], backups: links.slice(1, 6) }];
+    await verifyItems(items, false); items[0].backups = items[0].backups.slice(0, 5);
+    await addRoom({ id: newId(), created: Date.now(), featured: false, name: (i.name || q.text).slice(0, 60), topic: [i.league, i.venue].filter(Boolean).join(" · ").slice(0, 80), start: i.start || "", ...(i.cat || q.cat ? { cat: i.cat || q.cat } : {}), items });
+    b.disabled = false; b.textContent = "Make room";
+  }
+  else if (b.matches("[data-decline]")) { if (await patchReq({ id: q.id, status: "declined", note: "Declined by the owner." })) requestsPage(); }
+  else if (b.matches("[data-del]")) { if (confirm("Delete this request?") && (await fetch("api/requests?id=" + encodeURIComponent(q.id), { method: "DELETE", headers: reqHdr() })).ok) requestsPage(); }
+});
 async function route() {
   clearInterval(timer); clearInterval(liveT); onkeydown = null; onvisibilitychange = null;
   const h = location.hash || "#/";
@@ -960,6 +1065,7 @@ async function route() {
     room(byId(decodeURIComponent(id)), si, ss);
   }
   else if (h.startsWith("#/room/")) { const [code, si, ss] = h.slice(7).split("/"); room(dec(code), si, ss); }
+  else if (h === "#/requests") requestsPage();
   else if (h === "#/new") { if (isOwner) newRoom(); else { home(); showLogin(); } }
   else home();
   window.scrollTo(0, 0);
