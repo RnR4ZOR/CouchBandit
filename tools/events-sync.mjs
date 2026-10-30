@@ -6,7 +6,16 @@
 // DRY=1 prints the rooms instead of sending them.
 import { readFile } from "node:fs/promises";
 
-const cfg = JSON.parse(await readFile(new URL("./channels.json", import.meta.url), "utf8"));
+let cfg = JSON.parse(await readFile(new URL("./channels.json", import.meta.url), "utf8"));
+// The owner's approved list (edited on the site's Sources page) wins over channels.json when it's been saved
+try {
+  const live = await (await fetch((process.env.SITE || "").replace(/\/+$/, "") + "/api/sources", { signal: AbortSignal.timeout(10000) })).json();
+  if (live && live.categories && Object.keys(live.categories).length) {
+    cfg = { days_ahead: live.days_ahead, skip_titles: live.skip_titles || cfg.skip_titles,
+      categories: Object.fromEntries(Object.entries(live.categories).map(([c, v]) => [c, (v.channels || []).map(h => ({ handle: h, alts: v.alts || [] }))])) };
+    console.log("Using the approved sources list from the site.");
+  }
+} catch (e) { console.log("Using tools/channels.json (site sources not available)."); }
 const KEY = process.env.YT_API_KEY || "";
 const DAYS = cfg.days_ahead || 14, MAX_BACKUPS = 5, HOUR = 3600e3;
 const SKIP = cfg.skip_titles ? new RegExp(cfg.skip_titles, "i") : null;

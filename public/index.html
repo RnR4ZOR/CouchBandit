@@ -78,6 +78,11 @@ textarea{min-height:80px;resize:vertical}
 .reqinfo dt{font:700 11px var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:2px}.reqinfo dd{margin:0}
 .reqown{display:grid;gap:10px;border-top:1px dashed var(--line);padding-top:12px}
 .reqown summary{cursor:pointer}
+.lbl{font:700 11px var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.srclist{list-style:none;margin:8px 0;padding:0;display:grid;gap:6px}
+.srcrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:10px;word-break:break-all;transition:border-color .2s}
+.srcrow:hover{border-color:var(--accent)}
+.srcadd{display:flex;gap:8px}.srcadd input{flex:1}
 .empty{border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--muted);text-align:center}
 .secthead{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .files{display:grid;gap:10px}
@@ -225,6 +230,7 @@ span.star{pointer-events:none}
     <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Featured</span><em id="ixFeat"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="archiveSec"><b>▤</b><span class="t">Past events</span><em id="ixPast"></em></a>
   </div>
+  <a class="ixgo" href="#/sources" data-ix id="ixSrc" hidden><b>⛨</b><span class="t">Approved sources</span></a>
   <a class="ixgo" href="#/requests" data-ix id="ixReq" hidden><b>✦</b><span class="t">Requests</span><em id="ixReqN"></em></a>
   <div class="ixgrp" id="ixCatGrp" hidden><span class="ixlbl">Sports</span><div id="ixCats"></div></div>
   <div class="ixgrp"><span class="ixlbl">Rooms</span><div id="ixRooms" class="ixrooms"></div></div>
@@ -569,7 +575,7 @@ function paintNav() {
   document.body.classList.toggle("dock", wide.matches);
   /* everyone gets the index; only the owner sees add-room and log out */
   $("#ixAdd").hidden = $("#ixLogout").hidden = !isOwner;
-  $("#reqBtn").hidden = $("#ixReq").hidden = !SERVER_ON; $("#ixTag").textContent = isOwner ? "Master index" : "Index";
+  $("#reqBtn").hidden = $("#ixReq").hidden = !SERVER_ON; $("#ixSrc").hidden = !(SERVER_ON && isOwner); $("#ixTag").textContent = isOwner ? "Master index" : "Index";
   let rail = false; try { rail = localStorage.getItem("cb-rail") === "1"; } catch (e) {} document.body.classList.toggle("rail", rail);
   document.documentElement.style.setProperty("--hh", $("header").offsetHeight + "px");
   if (wide.matches) { ixFill(); ixOpen = false; $("#ixMenu").setAttribute("aria-hidden", "false"); $("#ixMenu").classList.add("on"); }
@@ -1056,8 +1062,65 @@ document.addEventListener("click", async e => {
   else if (b.matches("[data-decline]")) { if (await patchReq({ id: q.id, status: "declined", note: "Declined by the owner." })) requestsPage(); }
   else if (b.matches("[data-del]")) { if (confirm("Delete this request?") && (await fetch("api/requests?id=" + encodeURIComponent(q.id), { method: "DELETE", headers: reqHdr() })).ok) requestsPage(); }
 });
+/* ===== Approved sources (owner): the channels the event sync may search, per sport, plus up to 5 extra backup links
+   per sport. Saved on the server; the sync reads it every run. ===== */
+const SRC_DEFAULT = {"categories": {"UFC": {"channels": ["@UFC"], "alts": []}, "ONE": {"channels": ["@ONEChampionship"], "alts": []}, "Boxing": {"channels": ["@MatchroomBoxing", "@TopRank", "@GoldenBoyBoxing", "@QueensberryPromotions"], "alts": []}, "AFL": {"channels": ["@AFL"], "alts": []}, "NBA": {"channels": ["@NBA"], "alts": []}, "NFL": {"channels": ["@NFL"], "alts": []}, "Tennis": {"channels": ["@ATPTour", "@WTA", "@AustralianOpen"], "alts": []}}, "days_ahead": 14, "skip_titles": "highlights|recap|full fight|best of|compilation|reaction|trailer|teaser"};
+let SRC = null;
+const srcRow = (v, kind) => `<li class="srcrow"><span>${esc(v)}</span><button type="button" class="btn alt sm" data-src-del="${kind}" aria-label="Remove">✕</button></li>`;
+function srcCat(name, v) {
+  return `<article class="card srccat" data-cat-name="${esc(name)}">
+    <div class="secthead" style="margin:0"><h3 class="cathead">${esc(name)}</h3><button type="button" class="btn alt sm" data-src-rmcat>Remove sport</button></div>
+    <div><span class="lbl">YouTube channels searched</span><ul class="srclist" data-list="channels">${v.channels.map(c => srcRow(c, "channels")).join("") || `<li class="note">None yet</li>`}</ul>
+      <div class="srcadd"><input data-in="channels" placeholder="@handle or channel link"><button type="button" class="btn sm" data-src-add="channels">Add</button></div></div>
+    <div><span class="lbl">Extra backup links for this sport (max 5)</span><ul class="srclist" data-list="alts">${v.alts.map(u => srcRow(u, "alts")).join("") || `<li class="note">None</li>`}</ul>
+      <div class="srcadd"><input data-in="alts" placeholder="https://twitch.tv/… or other link"><button type="button" class="btn sm" data-src-add="alts">Add</button></div></div>
+  </article>`;
+}
+function paintSources() {
+  const box = $("#srcList"); if (!box) return;
+  const cats = Object.entries(SRC.categories);
+  box.innerHTML = cats.length ? cats.map(([k, v]) => srcCat(k, v)).join("") : `<div class="empty">No sports yet. Add one above.</div>`;
+  $("#srcSkip").value = SRC.skip_titles || ""; $("#srcDays").value = SRC.days_ahead || 14;
+}
+async function sourcesPage() {
+  app.innerHTML = `<section style="display:grid;gap:16px"><a href="#/" class="note">← All rooms</a>
+    <div class="secthead" style="margin:0"><h2>Approved sources</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt sm" id="srcReset">Reset to defaults</button><button type="button" class="btn" id="srcSave">Save sources</button></div></div>
+    <p class="sub">The event sync only searches and uses what's listed here. Changes apply on its next hourly run.</p>
+    <div class="card"><div class="two"><label>Add a sport<span class="srcadd"><input id="srcNewCat" maxlength="24" placeholder="e.g. Rugby League"><button type="button" class="btn sm" id="srcAddCat">Add</button></span></label>
+      <label>Look ahead (days)<input id="srcDays" type="number" min="1" max="30"></label></div>
+      <label>Skip videos with these words (separate with |)<input id="srcSkip" maxlength="300"></label></div>
+    <div id="srcList" class="reqs"><div class="empty">Loading…</div></div></section>`;
+  try { const r = await fetch("api/sources", { cache: "no-store" }); SRC = r.ok ? await r.json() : null; } catch (e) {}
+  if (!SRC || !SRC.categories) SRC = JSON.parse(JSON.stringify(SRC_DEFAULT));
+  paintSources();
+  const app_ = $("#app");
+  app_.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const card = b.closest("[data-cat-name]"), cat = card && SRC.categories[card.dataset.catName];
+    if (b.dataset.srcAdd) { const kind = b.dataset.srcAdd, inp = card.querySelector(`[data-in="${kind}"]`), v = inp.value.trim(); if (!v) return;
+      if (kind === "alts" && !/^https:\/\//i.test(cleanLink(v))) return toast("Backup links need to start with https://");
+      if (kind === "alts" && cat.alts.length >= 5) return toast("Max 5 backup links per sport");
+      const val = kind === "alts" ? cleanLink(v) : v; if (!cat[kind].includes(val)) cat[kind].push(val); paintSources(); }
+    else if (b.dataset.srcDel) { const v = b.closest(".srcrow").querySelector("span").textContent; cat[b.dataset.srcDel] = cat[b.dataset.srcDel].filter(x => x !== v); paintSources(); }
+    else if (b.matches("[data-src-rmcat]")) { if (confirm(`Remove ${card.dataset.catName} and its sources?`)) { delete SRC.categories[card.dataset.catName]; paintSources(); } }
+    else if (b.id === "srcAddCat") { const n = $("#srcNewCat").value.trim().replace(/[^\w &+-]/g, "").slice(0, 24); if (!n) return; SRC.categories[n] = SRC.categories[n] || { channels: [], alts: [] }; $("#srcNewCat").value = ""; paintSources(); }
+    else if (b.id === "srcReset") { if (confirm("Put back the default channel list? (Not saved until you press Save.)")) { SRC = JSON.parse(JSON.stringify(SRC_DEFAULT)); paintSources(); } }
+    else if (b.id === "srcSave") saveSources(b);
+  };
+}
+async function saveSources(b) {
+  SRC.skip_titles = $("#srcSkip").value.trim(); SRC.days_ahead = +$("#srcDays").value || 14;
+  b.disabled = true; b.textContent = "Saving…";
+  try {
+    const r = await fetch("api/sources", { method: "PUT", headers: { "content-type": "application/json", ...reqHdr() }, body: JSON.stringify(SRC) });
+    if (r.status === 401) { toast("Your owner login expired. Log in again.", 6000); return; }
+    const j = await r.json(); if (!r.ok) { toast("Couldn't save: " + (j.error || r.status), 6000); return; }
+    SRC = j.sources; paintSources(); toast("Sources saved. The next sync uses them.");
+  } catch (e) { toast("Couldn't reach the server.", 6000); }
+  finally { b.disabled = false; b.textContent = "Save sources"; }
+}
 async function route() {
-  clearInterval(timer); clearInterval(liveT); onkeydown = null; onvisibilitychange = null;
+  clearInterval(timer); clearInterval(liveT); onkeydown = null; onvisibilitychange = null; app.onclick = null;
   const h = location.hash || "#/";
   if (h.startsWith("#/r/")) {
     const [id, si, ss] = h.slice(4).split("/");
@@ -1066,6 +1129,7 @@ async function route() {
   }
   else if (h.startsWith("#/room/")) { const [code, si, ss] = h.slice(7).split("/"); room(dec(code), si, ss); }
   else if (h === "#/requests") requestsPage();
+  else if (h === "#/sources") { if (isOwner || getPass()) sourcesPage(); else { home(); showLogin(); } }
   else if (h === "#/new") { if (isOwner) newRoom(); else { home(); showLogin(); } }
   else home();
   window.scrollTo(0, 0);
