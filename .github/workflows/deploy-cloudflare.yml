@@ -5,8 +5,7 @@
 # One-time setup, in GitHub: Settings -> Secrets and variables -> Actions -> New repository secret
 #   CLOUDFLARE_API_TOKEN   token with Account permissions "Cloudflare Pages: Edit" and "Workers KV Storage: Edit"
 #   CLOUDFLARE_ACCOUNT_ID  your Cloudflare account ID
-#   OWNER_USER             your owner username
-#   OWNER_PASS             your owner password
+#   OWNER_PASS             your master code (the only login needed)
 # Then run it once from Actions -> Deploy to Cloudflare -> Run workflow. Everything else is automatic:
 # it creates the Pages project and room storage, copies your current rooms across the first time,
 # sets the owner login and deploys.
@@ -78,11 +77,9 @@ jobs:
       - name: Owner login
         if: steps.ready.outputs.go == 'true'
         env:
-          OWNER_USER: ${{ secrets.OWNER_USER }}
           OWNER_PASS: ${{ secrets.OWNER_PASS }}
         run: |
-          if [ -z "$OWNER_USER" ] || [ -z "$OWNER_PASS" ]; then echo "OWNER_USER / OWNER_PASS not set. Owner login on Cloudflare will be off."; exit 0; fi
-          printf '%s' "$OWNER_USER" | wrangler pages secret put OWNER_USER --project-name "$PROJECT"
+          if [ -z "$OWNER_PASS" ]; then echo "OWNER_PASS not set. Master login on Cloudflare will be off."; exit 0; fi
           printf '%s' "$OWNER_PASS" | wrangler pages secret put OWNER_PASS --project-name "$PROJECT"
       - name: Deploy
         if: steps.ready.outputs.go == 'true'

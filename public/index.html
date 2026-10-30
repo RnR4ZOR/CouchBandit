@@ -415,7 +415,7 @@ const roomHref = r => r.id && byId(r.id) ? `#/r/${encodeURIComponent(r.id)}` : `
 const roomLink = r => `${location.origin}${location.pathname}${roomHref(r)}`;
 
 /* ===== Owner login. Only a one-way hash of the login is stored here, never the password itself. ===== */
-const OWNER = { salt: "c96004f1e51c1de4a087b0c8027ee886", iter: 310000, hash: "6d35cfa95661d82aff1cde1915567dda969e7ede8034c25211af78ef26664f45" };
+const OWNER = { salt: "c96004f1e51c1de4a087b0c8027ee886", iter: 310000, hash: "b18cda756fdc15c5bfd9522a5874adba666eb91e903b7ff43d6b8e52b4535460" };
 const REPO = { owner: "RnR4ZOR", repo: "CouchBandit", branch: "gh-pages", path: "rooms.json" };
 const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
 const unhex = s => new Uint8Array(s.match(/../g).map(x => parseInt(x, 16)));

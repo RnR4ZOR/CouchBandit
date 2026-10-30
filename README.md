@@ -23,17 +23,16 @@ Only share streams you have the right to share.
 
 ## Automatic Cloudflare deploy (recommended)
 
-Add four secrets in GitHub (**Settings → Secrets and variables → Actions**): `CLOUDFLARE_API_TOKEN` (Account permissions: Cloudflare Pages Edit, Workers KV Storage Edit), `CLOUDFLARE_ACCOUNT_ID`, `OWNER_USER`, `OWNER_PASS`. Then **Actions → Deploy to Cloudflare → Run workflow** once. It creates the Pages project and room storage, copies your current rooms across, sets the owner login and deploys to `https://couchbandit.pages.dev`. Every push to `main` after that redeploys by itself.
+Add three secrets in GitHub (**Settings → Secrets and variables → Actions**): `CLOUDFLARE_API_TOKEN` (Account permissions: Cloudflare Pages Edit, Workers KV Storage Edit), `CLOUDFLARE_ACCOUNT_ID`, `OWNER_PASS`. Then **Actions → Deploy to Cloudflare → Run workflow** once. It creates the Pages project and room storage, copies your current rooms across, sets the owner login and deploys to `https://couchbandit.pages.dev`. Every push to `main` after that redeploys by itself.
 
 ## Couch Bandit on Cloudflare (log in anywhere, no GitHub key) (manual setup)
 
-The same code runs on GitHub Pages and Cloudflare Pages. On Cloudflare the owner login is checked by the server and rooms are saved on the server, so Masterkey can log in on any device and save straight away.
+The same code runs on GitHub Pages and Cloudflare Pages. On Cloudflare the owner login is checked by the server and rooms are saved on the server, so the master can log in on any device and save straight away.
 
 1. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git** → pick **CouchBandit**. Build command: none. Build output directory: `public`. Deploy.
 2. **Storage & Databases → KV → Create namespace** (any name, e.g. `couchbandit-rooms`). In the Pages project: **Settings → Bindings → Add → KV namespace**, variable name `ROOMS`, pick that namespace.
 3. In the Pages project: **Settings → Variables and Secrets → Add**, type **Secret**:
-   - `OWNER_USER` = your owner username
-   - `OWNER_PASS` = your owner password
+   - `OWNER_PASS` = your master code (no username needed)
 4. **Deployments → Retry deployment** (so the settings take effect).
 
 The first time you open the Cloudflare site it shows the rooms from `rooms.json`; your first save copies them onto the server.
