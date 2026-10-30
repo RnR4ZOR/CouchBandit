@@ -58,6 +58,13 @@ textarea{min-height:80px;resize:vertical}
 .thumb .when{position:absolute;right:10px;bottom:10px;font:700 12px var(--body);background:rgba(0,0,0,.6);padding:3px 8px;border-radius:5px}
 .room .meta{padding:10px 8px 6px;display:grid;gap:2px}
 .room .meta span{font-size:13px;color:var(--muted)}
+.cats{display:flex;gap:8px;overflow-x:auto;padding:2px 0 14px;scrollbar-width:none}.cats::-webkit-scrollbar{display:none}
+.catgrp{display:grid;gap:12px;margin-bottom:26px;animation:catIn .35s cubic-bezier(.2,.8,.2,1) both}
+.cathead{display:flex;align-items:center;gap:10px;font-size:22px;border-left:4px solid var(--accent);padding-left:10px}
+.cathead span{font:700 12px var(--body);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+.cattag{background:var(--accent);color:var(--accent-ink);border-radius:3px;padding:0 5px;margin-right:6px;font-weight:800}
+@keyframes catIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.catgrp{animation:none}}
 .empty{border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--muted);text-align:center}
 .secthead{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .files{display:grid;gap:10px}
@@ -448,6 +455,11 @@ function startLabel(start) {
   if (t <= now) return "Started";
   return t.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
+const CATS = ["UFC", "ONE", "Boxing", "AFL", "NBA", "NFL", "Tennis"];
+const catOf = r => r.cat || "Other";
+const catOrder = c => { const i = CATS.indexOf(c); return i < 0 ? (c === "Other" ? 99 : 50) : i; };
+/* auto event times are saved in UTC; the time picker wants local "YYYY-MM-DDTHH:mm" */
+const localInput = s => { if (!s || !/Z$/.test(s)) return s || ""; const d = new Date(s); if (isNaN(d)) return ""; return new Date(d - d.getTimezoneOffset() * 60e3).toISOString().slice(0, 16); };
 const newId = () => Math.random().toString(36).slice(2, 10).padEnd(8, "0");
 const HOUR = 3600e3;
 const expired = () => false;
@@ -643,7 +655,7 @@ function askToken() {
 function roomCard(r) {
   const p = parse(r.items[0].url);
   const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Delete room" title="Delete room">✕</button><button type="button" class="star${r.featured ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}" aria-label="${r.featured ? "Remove from featured" : "Add to featured"}">${r.featured ? "★" : "☆"}</button>` : (r.featured ? `<span class="star on" aria-hidden="true">★</span>` : "");
-  return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${esc(p.label || "Stream")}</span>${initials(r.name)}${isLive(r) ? `<span class="badge live">Live</span>` : isSoon(r) ? `<span class="badge soon">Soon</span>` : ""}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
+  return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${r.cat ? `<b class="cattag">${esc(r.cat)}</b>` : ""}${esc(p.label || "Stream")}${r.auto ? " · auto" : ""}</span>${initials(r.name)}${isLive(r) ? `<span class="badge live">Live</span>` : isSoon(r) ? `<span class="badge soon">Soon</span>` : ""}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
     <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " stream" : " streams")))}</span></div></a></div>`;
 }
 /* Owner only: star a room to pin it in Featured on the home page */
@@ -683,6 +695,7 @@ function archiveHTML(old) {
     return `<details class="file"><summary><span class="tab">${new Date(g.t).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}</span><span class="ev"><b>${esc(g.name)}</b><span>${fmtD(g.t)} · ${fmtT(g.t)} · ${g.rooms.length} stream${g.rooms.length > 1 ? "s" : ""}</span></span><span class="chev" aria-hidden="true">›</span></summary><div class="segs">${rows}</div></details>`;
   }).join("");
 }
+let catSel = "all";
 function home() {
   app.innerHTML = `
   <section class="hero solo">
@@ -702,6 +715,7 @@ function home() {
   </section>
   <section id="rooms">
     <div class="secthead"><h2>All rooms</h2><div class="tools"><div class="filters" id="filters" role="group" aria-label="Filter rooms"><button type="button" class="chip" data-filter="all" aria-pressed="true">All</button><button type="button" class="chip" data-filter="live" aria-pressed="false">Live</button><button type="button" class="chip" data-filter="soon" aria-pressed="false">Upcoming</button><button type="button" class="chip" data-filter="featured" aria-pressed="false">Featured</button></div><input id="roomSearch" type="search" placeholder="Search rooms" aria-label="Search rooms">${isOwner ? `<span class="note">☆ features a room (tap again to unfeature), ✕ deletes it</span>` : ""}</div></div>
+    <div class="filters cats" id="cats" role="group" aria-label="Sport"></div>
     <div id="roomList"><div class="empty">Loading rooms…</div></div>
   </section>
   <section id="archiveSec" hidden>
@@ -715,13 +729,21 @@ function home() {
     const f = $("#filters [aria-pressed='true']")?.dataset.filter || "all";
     const pass = r => f === "all" || (f === "live" && isLive(r)) || (f === "soon" && r.start && new Date(r.start) > new Date()) || (f === "featured" && r.featured);
     const arc = $("#archiveList"); const old = ROOMS.filter(isArchived); $("#archiveSec").hidden = !old.length; arc.innerHTML = archiveHTML(old);
-    const list = sorted(ROOMS).filter(r => !isArchived(r)).filter(pass).filter(r => !q || (r.name + " " + (r.topic || "")).toLowerCase().includes(q));
-    box.innerHTML = list.length ? `<div class="rooms">${list.map(roomCard).join("")}</div>` : `<div class="empty">${q || f !== "all" ? "No rooms match that." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`; };
+    const cur = ROOMS.filter(r => !isArchived(r)), cats = [...new Set(cur.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
+    if (!cats.includes(catSel)) catSel = "all";
+    $("#cats").hidden = cats.length < 2 && cats[0] === "Other";
+    $("#cats").innerHTML = ["all", ...cats].map(c => `<button type="button" class="chip" data-cat="${esc(c)}" aria-pressed="${c === catSel}">${c === "all" ? "All sports" : esc(c)}<small>${c === "all" ? cur.length : cur.filter(r => catOf(r) === c).length} rooms</small></button>`).join("");
+    const list = sorted(cur).filter(pass).filter(r => catSel === "all" || catOf(r) === catSel).filter(r => !q || (r.name + " " + (r.topic || "") + " " + catOf(r)).toLowerCase().includes(q));
+    const groups = catSel === "all" && cats.length > 1 ? cats.map(c => [c, list.filter(r => catOf(r) === c)]).filter(g => g[1].length) : null;
+    box.innerHTML = !list.length ? `<div class="empty">${q || f !== "all" || catSel !== "all" ? "No rooms match that." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`
+      : groups ? groups.map(([c, rs]) => `<div class="catgrp"><h3 class="cathead">${esc(c === "Other" ? "Other rooms" : c)}<span>${rs.length}</span></h3><div class="rooms">${rs.map(roomCard).join("")}</div></div>`).join("")
+      : `<div class="rooms">${list.map(roomCard).join("")}</div>`; };
   paint(); loadRooms().then(() => { paint(); if (isOwner) ixFill(); });
   /* keep the list fresh while friends sit on the home page: every 90 seconds, and when they come back to the tab */
   clearInterval(liveT); liveT = setInterval(() => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); }, 90e3);
   onvisibilitychange = () => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); };
   $("#roomSearch").addEventListener("input", paint);
+  $("#cats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; catSel = b.dataset.cat; paint(); });
   $("#filters").addEventListener("click", e => { const b = e.target.closest("[data-filter]"); if (!b) return; $("#filters").querySelectorAll("[data-filter]").forEach(x => x.setAttribute("aria-pressed", x === b)); paint(); });
 }
 document.addEventListener("click", async e => {
@@ -762,7 +784,8 @@ function bindStreams(box) {
 function roomForm(r, title) {
   return `<div class="secthead" style="margin:0"><h2>${title}</h2>${r.id ? `<button type="button" class="btn alt sm" id="edClose">Close</button>` : ""}</div>
     <label>Room name<input id="ed_name" required maxlength="60" value="${esc(r.name || "")}" placeholder="Friday fight night"></label>
-    <div class="two"><label>What's on<input id="ed_topic" maxlength="80" value="${esc(r.topic || "")}" placeholder="Main card from 12"></label><label>Starts at (optional)<input id="ed_start" type="datetime-local" value="${esc(r.start || "")}"></label></div>
+    <div class="two"><label>What's on<input id="ed_topic" maxlength="80" value="${esc(r.topic || "")}" placeholder="Main card from 12"></label><label>Starts at (optional)<input id="ed_start" type="datetime-local" value="${esc(localInput(r.start))}"></label></div>
+    <label>Category (optional)<input id="ed_cat" maxlength="24" list="catList" value="${esc(r.cat || "")}" placeholder="UFC, Boxing, AFL…"><datalist id="catList">${CATS.map(c => `<option value="${c}">`).join("")}</datalist></label>
     <div data-rows style="display:grid;gap:12px">${(r.items && r.items.length ? r.items : [{}]).map(streamRow).join("")}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn alt" data-addstream>+ Add stream</button><button class="btn" type="submit">Save room</button></div>
     <p class="note">Rooms are saved for everyone. Only you can add, change or remove them.</p>`;
@@ -775,6 +798,7 @@ async function submitRoom(form, old) {
   const sb = form.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Saving…";
   await verifyItems(items, false);
   const nr = { id: old.id || newId(), created: old.created || Date.now(), featured: !!old.featured, name: $("#ed_name").value.trim() || "Room", topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
+  const cat = $("#ed_cat").value.trim().replace(/[^\w &+-]/g, "").slice(0, 24); if (cat) nr.cat = cat; /* an edited auto room becomes yours: the sync stops changing it */
   const ok = await saveRooms(list => list.some(x => x.id === nr.id) ? list.map(x => x.id === nr.id ? { ...nr, featured: !!x.featured } : x) : [...list, nr], (old.id ? "Update room: " : "Add room: ") + nr.name);
   sb.disabled = false; sb.textContent = "Save room";
   if (ok) location.hash = "#/r/" + encodeURIComponent(nr.id);
