@@ -1,5 +1,5 @@
 // Couch Bandit room list on Cloudflare: /api/rooms
-// GET  -> the room list (anyone)
+// GET  -> the room list (anyone). Draft event rooms (no links yet) are only sent to the owner.
 // PUT  [rooms] -> replace the room list (owner only, signed pass from /api/login)
 // The list is kept in the ROOMS KV namespace under one key.
 import { isOwner, json } from "./_auth.js";
@@ -7,7 +7,10 @@ import { KEY, SKIP_KEY, clean } from "./_rooms.js";
 export async function onRequest({ request, env }) {
   const kv = env.ROOMS;
   if (!kv) return json({ error: "Room storage isn't connected. Bind a KV namespace named ROOMS in Cloudflare." }, 503);
-  if (request.method === "GET") return json(await kv.get(KEY, "json")); // null = never saved, [] = all rooms deleted
+  if (request.method === "GET") { // null = never saved, [] = all rooms deleted
+    const list = await kv.get(KEY, "json");
+    return json(Array.isArray(list) && !(await isOwner(request, env)) ? list.filter(r => !r.draft) : list);
+  }
   if (request.method === "PUT") {
     if (!(await isOwner(request, env))) return json({ error: "Log in as owner again." }, 401);
     let list; try { list = await request.json(); } catch { return json({ error: "bad body" }, 400); }

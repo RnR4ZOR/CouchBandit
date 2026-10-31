@@ -22,10 +22,15 @@ export async function onRequest({ request, env }) {
     if (skip.has(r.id)) continue;
     const old = byId.get(r.id);
     if (!old) { list.push({ ...r, created: Date.now() }); added++; }
-    else if (old.auto) { Object.assign(old, { name: r.name, topic: r.topic, start: r.start, cat: r.cat, items: r.items }); updated++; }
+    else if (old.auto) {
+      Object.assign(old, { name: r.name, topic: r.topic, start: r.start, cat: r.cat });
+      if (!r.draft) { old.items = r.items; delete old.draft; } // a draft never wipes links already found
+      updated++;
+    }
   }
   const cutoff = Date.now() - 30 * 24 * 3600e3;
-  const kept = list.filter(r => !(r.auto && r.start && new Date(r.start).getTime() < cutoff));
+  const stale = Date.now() - 12 * 3600e3; // drafts that never got links are cleared 12 hours after they start
+  const kept = list.filter(r => !(r.auto && r.start && new Date(r.start).getTime() < (r.draft ? stale : cutoff)));
   await kv.put(KEY, JSON.stringify(clean(kept)));
   return json({ ok: true, added, updated, removedOld: list.length - kept.length, total: kept.length });
 }

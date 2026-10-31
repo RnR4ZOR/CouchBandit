@@ -57,3 +57,6 @@ Anyone can tap **Request event**. The event's name, date/time, league and venue 
 - **Matchday** (in every room): other rooms on now with one-tap switching, plus live scores and the ladder for AFL, NBA and NFL from ESPN's public feeds (`functions/api/matchday.js`, cached 60 s). Scores stay blurred until the viewer taps Show scores. UFC shows the fight card only (names, Live or Upcoming), never results.
 - **TV mode**: turns on by itself on smart TVs and TV sticks (Fire TV, Google TV, Tizen, webOS), or from Index → TV mode, or by adding `?tv=1` to the link. Remote arrows move, OK opens, Back goes back.
 - **Install app**: the site installs as an app on phones, laptops and Android TVs (Index → Install app, or Add to Home Screen on iPhone).
+
+## Draft rooms for the week ahead
+The event sync also reads ESPN's public schedule for UFC, AFL, NBA and NFL and makes a room for every event in the next 7 days that has no official stream yet. These drafts already have the name, sport, start time and empty stream slots (UFC: Main card and Prelims). Only the owner sees them, under **Needs links** on the home page and in the Index. Open one, paste links, save, and it goes live for everyone. Drafts that never get links are cleared 12 hours after they start.

@@ -105,6 +105,35 @@ for (const e of found.sort((a, b) => new Date(a.start) - new Date(b.start))) {
 }
 for (const r of rooms) r.items[0].backups = r.items[0].backups.slice(0, MAX_BACKUPS);
 
+// ===== Schedule: every UFC event and AFL / NBA / NFL game in the next 7 days (ESPN's public schedule) =====
+// Events with no official stream yet become draft rooms: named, timed and categorised, with empty stream slots the owner
+// fills in. Drafts are only shown to the owner until links are added. An event that already has an official stream
+// room above isn't drafted twice.
+const SCHED_DAYS = 7;
+const SCHED = [["UFC", "mma/ufc"], ["AFL", "australian-football/afl"], ["NBA", "basketball/nba"], ["NFL", "football/nfl"]];
+const ymd = t => new Date(t).toISOString().slice(0, 10).replace(/-/g, "");
+let drafts = 0;
+for (const [cat, path] of SCHED) {
+  try {
+    const j = await get(`https://site.api.espn.com/apis/site/v2/sports/${path}/scoreboard?dates=${ymd(Date.now())}-${ymd(Date.now() + SCHED_DAYS * 24 * HOUR)}&limit=200`, "json");
+    let n = 0;
+    for (const ev of j.events || []) {
+      const c0 = (ev.competitions || [])[0] || {}, start = ev.date || c0.date, t = new Date(start).getTime();
+      if (isNaN(t) || t < Date.now() - 3 * HOUR || t > Date.now() + SCHED_DAYS * 24 * HOUR || (ev.status?.type?.state || c0.status?.type?.state) === "post") continue;
+      const fights = cat === "UFC";
+      const side = k => (c0.competitors || []).find(x => x.homeAway === k)?.team?.displayName;
+      const name = (fights ? ev.name : side("away") && side("home") ? `${side("away")} v ${side("home")}` : ev.name || ev.shortName || cat + " game").slice(0, 60);
+      if (rooms.some(r => r.cat === cat && Math.abs(new Date(r.start) - t) < 6 * HOUR && alike(r.name, name))) continue;
+      const venue = c0.venue?.fullName || c0.venue?.address?.city || "";
+      rooms.push({ id: "s" + hash(cat + ev.id).slice(0, 12), auto: true, draft: true, cat, name, topic: [cat, venue].filter(Boolean).join(" · ").slice(0, 80), start: iso(t),
+        items: (fights ? ["Main card", "Prelims"] : ["Full game"]).map(title => ({ title, url: "", backups: [] })) });
+      n++;
+    }
+    drafts += n; log(`Schedule · ${cat}: ${n} upcoming without a stream yet`);
+  } catch (e) { misses.push(`Schedule ${cat}: ${e.message}`); }
+}
+log(`${drafts} draft rooms ready for links.`);
+
 log(`\n${rooms.length} event rooms from ${found.length} streams.`);
 if (misses.length) log("Channels that couldn't be read (check the handle in tools/channels.json):\n  " + misses.join("\n  "));
 if (process.env.DRY) { log(JSON.stringify(rooms, null, 2)); process.exit(0); }
