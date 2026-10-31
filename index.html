@@ -289,6 +289,7 @@ body.tv .tvhint{display:flex}
     <a class="ixgo" href="#/" data-ix data-jump="live"><b>●</b><span class="t">Live now</span><em id="ixLive"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="soon"><b>◷</b><span class="t">Upcoming</span><em id="ixSoon"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Featured</span><em id="ixFeat"></em></a>
+    <a class="ixgo" href="#/" data-ix data-jump="draftSec" id="ixDraftGo" hidden><b>✎</b><span class="t">Needs links</span><em id="ixDraft"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="archiveSec"><b>▤</b><span class="t">Past events</span><em id="ixPast"></em></a>
   </div>
   <a class="ixgo" href="#/sources" data-ix id="ixSrc" hidden><b>⛨</b><span class="t">Approved sources</span></a>
@@ -585,7 +586,7 @@ const okRoom = r => r && r.id && Array.isArray(r.items) && r.items.length;
 async function loadRooms() {
   try {
     let list = null;
-    if (await serverMode()) { const res = await fetch("api/rooms", { cache: "no-store" }); if (res.ok) list = await res.json(); }
+    if (await serverMode()) { const res = await fetch("api/rooms", { cache: "no-store", headers: getPass() ? { Authorization: "Bearer " + getPass() } : {} }); if (res.ok) list = await res.json(); }
     /* GitHub Pages: read the saved list straight from GitHub so new rooms show within seconds instead of
        waiting up to 10 minutes for the published copy. Free limit is 60 reads an hour per person; past that
        it falls back to the published rooms.json. */
@@ -604,6 +605,7 @@ async function loadRooms() {
 const getPass = () => { try { const p = localStorage.getItem("cb-pass") || ""; const m = /^owner\.(\d+)\./.exec(p); return m && Date.now() < +m[1] ? p : ""; } catch (e) { return ""; } };
 const setPass = p => { try { p ? localStorage.setItem("cb-pass", p) : localStorage.removeItem("cb-pass"); } catch (e) {} };
 const byId = id => ROOMS.find(r => r.id === id);
+const ready = () => ROOMS.filter(r => !r.draft); /* draft = scheduled event still waiting for links (owner only) */
 const roomHref = r => r.id && byId(r.id) ? `#/r/${encodeURIComponent(r.id)}` : `#/room/${enc(r)}`;
 const roomLink = r => `${location.origin}${location.pathname}${roomHref(r)}`;
 
@@ -653,7 +655,7 @@ function paintNav() {
   $("#addNav").hidden = !isOwner; $("#menuBtn").hidden = wide.matches;
   document.body.classList.toggle("dock", wide.matches);
   /* everyone gets the index; only the owner sees add-room and log out */
-  $("#ixAdd").hidden = $("#ixLogout").hidden = !isOwner;
+  $("#ixAdd").hidden = $("#ixLogout").hidden = $("#ixDraftGo").hidden = !isOwner;
   $("#reqBtn").hidden = $("#ixReq").hidden = !SERVER_ON; $("#ixSrc").hidden = !(SERVER_ON && isOwner); $("#ixTag").textContent = isOwner ? "Master index" : "Index";
   let rail = false; try { rail = localStorage.getItem("cb-rail") === "1"; } catch (e) {} document.body.classList.toggle("rail", rail);
   document.documentElement.style.setProperty("--hh", $("header").offsetHeight + "px");
@@ -664,7 +666,8 @@ wide.addEventListener?.("change", () => paintNav());
 /* ===== Master index: slide-out menu for the owner — add a room, jump to any section or room, log out ===== */
 function ixFill() {
   const n = (sel, v) => { $(sel).textContent = v ? v : ""; };
-  const act = ROOMS.filter(r => !isArchived(r));
+  const act = ready().filter(r => !isArchived(r));
+  n("#ixDraft", ROOMS.filter(r => r.draft).length);
   n("#ixLive", act.filter(isLive).length); n("#ixSoon", act.filter(r => r.start && new Date(r.start) > new Date()).length);
   n("#ixFeat", ROOMS.filter(r => r.featured).length); n("#ixPast", ROOMS.filter(isArchived).length);
   const fv = favs.get(); n("#ixMine", act.filter(r => isFav(r, fv)).length);
@@ -724,7 +727,7 @@ async function saveRooms(change, msg, retried) {
   if (!isOwner) { toast("Only the owner can change rooms"); return false; }
   if (getPass()) {
     try {
-      const g = await fetch("api/rooms", { cache: "no-store" });
+      const g = await fetch("api/rooms", { cache: "no-store", headers: { Authorization: "Bearer " + getPass() } });
       if (!g.ok) { toast("Couldn't load the latest rooms (" + g.status + "). Nothing was changed.", 7000); return false; }
       const raw = await g.json(); let fresh = raw === null ? asList(ROOMS) : asList(raw);
       const list = change(fresh);
@@ -846,19 +849,24 @@ function home() {
     <div class="filters cats" id="cats" role="group" aria-label="Sport"></div>
     <div id="roomList"><div class="empty">Loading rooms…</div></div>
   </section>
+  <section id="draftSec" hidden>
+    <div class="secthead"><h2>Needs links</h2><span class="note">Events in the next 7 days, added automatically. Only you can see these until you add a link.</span></div>
+    <div id="draftList" class="files"></div>
+  </section>
   <section id="archiveSec" hidden>
     <div class="secthead"><h2>Past events</h2><span class="note">Filed after 3 days, newest first</span></div>
     <div id="archiveList" class="files"></div>
   </section>`;
   const paint = () => { const box = $("#roomList"); if (!box) return;
-    const feat = ROOMS.filter(r => r.featured); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
+    const feat = ready().filter(r => r.featured); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
     paintMine();
-    const rec = recent.get().map(byId).filter(Boolean); $("#recentSec").hidden = !rec.length; $("#recentList").innerHTML = rec.length ? `<div class="rooms">${rec.slice(0, 3).map(roomCard).join("")}</div>` : "";
+    const rec = recent.get().map(byId).filter(r => r && !r.draft); $("#recentSec").hidden = !rec.length; $("#recentList").innerHTML = rec.length ? `<div class="rooms">${rec.slice(0, 3).map(roomCard).join("")}</div>` : "";
     const q = ($("#roomSearch")?.value || "").trim().toLowerCase();
     const f = $("#filters [aria-pressed='true']")?.dataset.filter || "all";
     const pass = r => f === "all" || (f === "live" && isLive(r)) || (f === "soon" && r.start && new Date(r.start) > new Date()) || (f === "featured" && r.featured);
-    const arc = $("#archiveList"); const old = ROOMS.filter(isArchived); $("#archiveSec").hidden = !old.length; arc.innerHTML = archiveHTML(old);
-    const cur = ROOMS.filter(r => !isArchived(r)), cats = [...new Set(cur.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
+    const arc = $("#archiveList"); const old = ready().filter(isArchived); $("#archiveSec").hidden = !old.length; arc.innerHTML = archiveHTML(old);
+    paintDrafts();
+    const cur = ready().filter(r => !isArchived(r)), cats = [...new Set(cur.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
     if (!cats.includes(catSel)) catSel = "all";
     $("#cats").hidden = cats.length < 2 && cats[0] === "Other";
     $("#cats").innerHTML = ["all", ...cats].map(c => `<button type="button" class="chip" data-cat="${esc(c)}" aria-pressed="${c === catSel}">${c === "all" ? "All sports" : esc(c)}<small>${(n => n + (n === 1 ? " room" : " rooms"))(c === "all" ? cur.length : cur.filter(r => catOf(r) === c).length)}</small></button>`).join("");
@@ -871,9 +879,20 @@ function home() {
   /* keep the list fresh while friends sit on the home page: every 90 seconds, and when they come back to the tab */
   clearInterval(liveT); liveT = setInterval(() => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); }, 90e3);
   onvisibilitychange = () => { if (!document.hidden && $("#roomList")) loadRooms().then(paint); };
+  /* Owner: scheduled events waiting for links, grouped by sport, soonest first */
+  function paintDrafts() {
+    const d = isOwner ? ROOMS.filter(r => r.draft && !isArchived(r)).sort((a, b) => roomTime(a) - roomTime(b)) : [];
+    $("#draftSec").hidden = !d.length; if (!d.length) { $("#draftList").innerHTML = ""; return; }
+    const open = new Set([...document.querySelectorAll("#draftList details[open]")].map(x => x.dataset.cat));
+    const cats = [...new Set(d.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
+    const fmt = t => new Date(t).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+    $("#draftList").innerHTML = cats.map(c => { const rs = d.filter(r => catOf(r) === c);
+      return `<details class="file" data-cat="${esc(c)}"${open.has(c) ? " open" : ""}><summary><span class="tab">${esc(c.slice(0, 5))}</span><span class="ev"><b>${esc(c)}</b><span>${rs.length} event${rs.length > 1 ? "s" : ""} · next ${fmt(roomTime(rs[0]))}</span></span><span class="chev" aria-hidden="true">›</span></summary><div class="segs">${rs.map(r =>
+        `<a class="seg" href="${roomHref(r)}"><i>Add links</i><b>${esc(r.name)}</b><span class="when">${fmt(roomTime(r))}</span></a>`).join("")}</div></details>`; }).join("");
+  }
   /* My teams: tap a sport or add a team; matching rooms (live first) show at the top */
   function paintMine() {
-    const v = favs.get(), cur = ROOMS.filter(r => !isArchived(r));
+    const v = favs.get(), cur = ready().filter(r => !isArchived(r));
     const cats = [...new Set([...CATS, ...cur.map(catOf).filter(c => c !== "Other"), ...v.cats])];
     $("#favCats").innerHTML = cats.map(c => `<button type="button" class="fav" data-fav="${esc(c)}" aria-pressed="${v.cats.includes(c)}">${esc(c)}</button>`).join("");
     $("#favTeams").innerHTML = v.teams.map(t => `<button type="button" class="fav team" data-team="${esc(t)}" aria-pressed="true" aria-label="Remove ${esc(t)}">${esc(t)}</button>`).join("");
@@ -982,13 +1001,13 @@ addEventListener("hashchange", () => document.body.classList.remove("lockscroll"
 
 /* Room switcher: buttons for every room, plus previous / next */
 function switcherHTML(r) {
-  if (!ROOMS.length) return "";
-  const i = ROOMS.findIndex(x => x.id === r.id);
-  const prev = ROOMS[(i < 0 ? 0 : i - 1 + ROOMS.length) % ROOMS.length], next = ROOMS[(i + 1) % ROOMS.length];
+  const RS = ready().filter(x => !isArchived(x)); if (!RS.length) return "";
+  const i = RS.findIndex(x => x.id === r.id);
+  const prev = RS[(i < 0 ? 0 : i - 1 + RS.length) % RS.length], next = RS[(i + 1) % RS.length];
   return `<nav class="switcher" aria-label="Switch room">
-    ${ROOMS.length > 1 ? `<a class="chip nav" href="${roomHref(prev)}" aria-label="Previous room">‹ Prev</a>` : ""}
-    <div class="swrooms">${ROOMS.map(x => `<a class="chip" href="${roomHref(x)}" aria-current="${x.id === r.id}">${esc(x.name)}</a>`).join("")}</div>
-    ${ROOMS.length > 1 ? `<a class="chip nav" href="${roomHref(next)}" aria-label="Next room">Next ›</a>` : ""}
+    ${RS.length > 1 ? `<a class="chip nav" href="${roomHref(prev)}" aria-label="Previous room">‹ Prev</a>` : ""}
+    <div class="swrooms">${RS.map(x => `<a class="chip" href="${roomHref(x)}" aria-current="${x.id === r.id}">${esc(x.name)}</a>`).join("")}</div>
+    ${RS.length > 1 ? `<a class="chip nav" href="${roomHref(next)}" aria-label="Next room">Next ›</a>` : ""}
   </nav>`;
 }
 
@@ -1056,7 +1075,7 @@ function room(r, si, ss) {
   $("#srcbar").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; auto = false; goFull(); if (b.hasAttribute("data-reload")) show(idx, src); else show(idx, +b.dataset.s); });
   $("#tapFs").onclick = () => goFull();
   $("#exitFs").onclick = () => exitFull();
-  if (wantFull) { wantFull = false; goFull(); }
+  if (wantFull) { wantFull = false; if (!r.draft) goFull(); }
   $("#shareBtn").onclick = async () => { if (navigator.share) { try { await navigator.share({ title: r.name, text: `Join me on Couch Bandit: ${r.name}`, url: link }); } catch (e) {} return; }
     const sel = () => { $("#shareLink").select(); toast("Link selected, copy it"); }; navigator.clipboard ? navigator.clipboard.writeText(link).then(() => toast("Link copied"), sel) : sel(); };
   $("#fsBtn").onclick = () => goFull();
@@ -1079,7 +1098,11 @@ function room(r, si, ss) {
   /* start on the link that last played well on this device */
   const startSrc = i => { if (!auto) return +ss || 0; const g = good.get(), l = sourcesOf(r.items[Math.min(Math.max(0, i), r.items.length - 1)]);
     let b = 0; l.forEach((u, j) => { if ((g[u] || 0) > (g[l[b]] || 0)) b = j; }); return b; };
-  show(+si || 0, startSrc(+si || 0), true);
+  if (r.draft) {
+    $("#player").innerHTML = `<div class="empty" style="position:absolute;inset:0;display:grid;place-content:center;gap:8px;border:0"><b style="font:800 22px var(--display);text-transform:uppercase;color:var(--ink)">No links yet</b><span>Add a main link and backups below, then save. The room goes live for everyone once it has a link.</span></div>`;
+    $("#srcbar").innerHTML = ""; $("#queue").innerHTML = r.items.map(it => `<li><button disabled><b>${esc(it.title)}</b><small>Waiting for a link</small></button></li>`).join("");
+    if ($("#editBtn")) $("#editBtn").click();
+  } else show(+si || 0, startSrc(+si || 0), true);
   matchday(r);
   clearInterval(timer);
   if (r.start && new Date(r.start) > new Date()) {
@@ -1117,7 +1140,7 @@ async function matchday(r) {
   const card = $("#mdCard"); if (!card) return;
   const cat = catOf(r), feed = MD_SPORTS.includes(cat.toUpperCase());
   let data = null, first = true;
-  const otherRooms = () => sorted(ROOMS.filter(x => x.id !== r.id && !isArchived(x) && (isLive(x) || (x.start && new Date(x.start) - Date.now() < 24 * HOUR && new Date(x.start) > new Date()))))
+  const otherRooms = () => sorted(ready().filter(x => x.id !== r.id && !isArchived(x) && (isLive(x) || (x.start && new Date(x.start) - Date.now() < 24 * HOUR && new Date(x.start) > new Date()))))
     .sort((a, b) => (catOf(b) === cat) - (catOf(a) === cat)).slice(0, 12);
   const when = st => { const t = new Date(st); if (isNaN(t)) return ""; const today = t.toDateString() === new Date().toDateString(); return t.toLocaleString(undefined, today ? { hour: "numeric", minute: "2-digit" } : { weekday: "short", hour: "numeric", minute: "2-digit" }); };
   const tm = favs.get().teams.map(t => t.toLowerCase()), favTeam = n => tm.some(t => String(n).toLowerCase().includes(t));
