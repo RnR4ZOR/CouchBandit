@@ -1,0 +1,14 @@
+{
+  "name": "Couch Bandit",
+  "short_name": "Couch Bandit",
+  "description": "Pick a room, hit play, watch with your mates.",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070707",
+  "theme_color": "#070707",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
