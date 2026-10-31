@@ -105,7 +105,7 @@ for (const e of found.sort((a, b) => new Date(a.start) - new Date(b.start))) {
 }
 for (const r of rooms) r.items[0].backups = r.items[0].backups.slice(0, MAX_BACKUPS);
 
-// ===== Schedule: every UFC event and AFL / NBA / NFL game in the next 7 days (ESPN's public schedule) =====
+// ===== Schedule: every UFC, ONE and Boxing event, AFL / NBA / NFL game and ATP / WTA tournament in the next 7 days =====
 // Events with no official stream yet become draft rooms: named, timed and categorised, with empty stream slots the owner
 // fills in. Drafts are only shown to the owner until links are added. An event that already has an official stream
 // room above isn't drafted twice.
@@ -130,6 +130,46 @@ for (const [cat, path] of SCHED) {
       n++;
     }
     drafts += n; log(`Schedule · ${cat}: ${n} upcoming without a stream yet`);
+  } catch (e) { misses.push(`Schedule ${cat}: ${e.message}`); }
+}
+// Tennis (ESPN): one room per ATP/WTA tournament running in the next 7 days. While it's on, its start rolls forward to
+// today so the draft isn't cleared mid-tournament; it drops off after the final.
+for (const tour of ["atp", "wta"]) {
+  try {
+    const j = await get(`https://site.api.espn.com/apis/site/v2/sports/tennis/${tour}/scoreboard?dates=${ymd(Date.now())}-${ymd(Date.now() + SCHED_DAYS * 24 * HOUR)}`, "json");
+    let n = 0;
+    for (const ev of j.events || []) {
+      const s = new Date(ev.date).getTime(), end = new Date(ev.endDate || ev.date).getTime();
+      if (isNaN(s) || end < Date.now() || s > Date.now() + SCHED_DAYS * 24 * HOUR) continue;
+      const name = `${ev.name || ev.shortName} (${tour.toUpperCase()})`.slice(0, 60);
+      if (rooms.some(r => r.cat === "Tennis" && alike(r.name, name))) continue;
+      const venue = ev.groupings?.[0]?.competitions?.[0]?.venue?.address?.city || "";
+      rooms.push({ id: "s" + hash("Tennis" + tour + ev.id).slice(0, 12), auto: true, draft: true, cat: "Tennis", name,
+        topic: ["Tennis", tour.toUpperCase(), venue].filter(Boolean).join(" · ").slice(0, 80), start: iso(Math.max(s, Date.now() - HOUR)),
+        items: ["Centre court", "Outside courts"].map(title => ({ title, url: "", backups: [] })) });
+      n++;
+    }
+    drafts += n; log(`Schedule · Tennis ${tour.toUpperCase()}: ${n} tournaments`);
+  } catch (e) { misses.push(`Schedule Tennis ${tour}: ${e.message}`); }
+}
+
+// ONE and Boxing (TheSportsDB). The free key only returns the next event per league; a SPORTSDB_KEY returns more.
+for (const [cat, league] of [["ONE", 4495], ["Boxing", 4445]]) {
+  try {
+    const j = await get(`https://www.thesportsdb.com/api/v1/json/${process.env.SPORTSDB_KEY || "123"}/eventsnextleague.php?id=${league}`, "json");
+    let n = 0;
+    for (const ev of j.events || []) {
+      const ts = ev.strTimestamp || (ev.dateEvent && `${ev.dateEvent}T${ev.strTime || "00:00:00"}`);
+      const t = ts ? new Date(ts + (/Z|[+-]\d\d:?\d\d$/.test(ts) ? "" : "Z")).getTime() : NaN;
+      if (isNaN(t) || t < Date.now() - 3 * HOUR || t > Date.now() + SCHED_DAYS * 24 * HOUR) continue;
+      const name = String(ev.strEvent || cat + " event").slice(0, 60);
+      if (rooms.some(r => r.cat === cat && Math.abs(new Date(r.start) - t) < 12 * HOUR && alike(r.name, name))) continue;
+      const venue = [ev.strVenue, ev.strCity].filter(Boolean).join(", ");
+      rooms.push({ id: "s" + hash(cat + ev.idEvent).slice(0, 12), auto: true, draft: true, cat, name, topic: [cat, venue].filter(Boolean).join(" · ").slice(0, 80), start: iso(t),
+        items: ["Main card", "Prelims"].map(title => ({ title, url: "", backups: [] })) });
+      n++;
+    }
+    drafts += n; log(`Schedule · ${cat}: ${n} upcoming`);
   } catch (e) { misses.push(`Schedule ${cat}: ${e.message}`); }
 }
 log(`${drafts} draft rooms ready for links.`);
