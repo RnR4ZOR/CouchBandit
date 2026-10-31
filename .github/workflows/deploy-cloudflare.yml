@@ -1,4 +1,5 @@
-# Publishes Couch Bandit to Cloudflare Pages (https://couchbandit.pages.dev) on every push to main.
+# Publishes Couch Bandit to Cloudflare Pages (https://couchbandit.pages.dev) AND the Worker (couchbandit.<you>.workers.dev)
+# on every push to main. Both share the same room storage and master code, so they always show the same rooms.
 # On Cloudflare, rooms are saved on the server: the owner logs in on any device and saves straight away,
 # and friends see changes within seconds.
 #
@@ -13,7 +14,7 @@ name: Deploy to Cloudflare
 on:
   push:
     branches: [main]
-    paths: ["public/**", "functions/**", ".github/workflows/deploy-cloudflare.yml"]
+    paths: ["public/**", "functions/**", "lib/**", "worker/**", ".github/workflows/deploy-cloudflare.yml"]
   workflow_dispatch:
 concurrency:
   group: cloudflare
@@ -84,3 +85,23 @@ jobs:
       - name: Deploy
         if: steps.ready.outputs.go == 'true'
         run: wrangler pages deploy --project-name "$PROJECT" --branch main --commit-dirty=true
+      - name: Deploy Worker (workers.dev, same rooms)
+        if: steps.ready.outputs.go == 'true'
+        env:
+          OWNER_PASS: ${{ secrets.OWNER_PASS }}
+        run: |
+          cat > wrangler.worker.toml <<EOF
+          name = "$PROJECT"
+          main = "worker/index.js"
+          compatibility_date = "2025-01-01"
+          workers_dev = true
+          [assets]
+          directory = "public"
+          binding = "ASSETS"
+          [[kv_namespaces]]
+          binding = "ROOMS"
+          id = "${{ steps.kv.outputs.id }}"
+          EOF
+          sed -i 's/^ *//' wrangler.worker.toml
+          wrangler deploy -c wrangler.worker.toml
+          if [ -n "$OWNER_PASS" ]; then printf '%s' "$OWNER_PASS" | wrangler secret put OWNER_PASS -c wrangler.worker.toml; fi

@@ -3,12 +3,85 @@
   "days_ahead": 14,
   "skip_titles": "highlights|recap|full fight|best of|compilation|reaction|trailer|teaser",
   "categories": {
-    "UFC": [{ "handle": "@UFC" }],
-    "ONE": [{ "handle": "@ONEChampionship" }],
-    "Boxing": [{ "handle": "@MatchroomBoxing" }, { "handle": "@TopRank" }, { "handle": "@GoldenBoyBoxing" }, { "handle": "@QueensberryPromotions" }],
-    "AFL": [{ "handle": "@AFL" }],
-    "NBA": [{ "handle": "@NBA" }],
-    "NFL": [{ "handle": "@NFL" }],
-    "Tennis": [{ "handle": "@ATPTour" }, { "handle": "@WTA" }, { "handle": "@AustralianOpen" }]
+    "UFC": [
+      {
+        "handle": "@UFC"
+      },
+      {
+        "handle": "@espnmma"
+      }
+    ],
+    "ONE": [
+      {
+        "handle": "@ONEChampionship"
+      },
+      {
+        "handle": "@ONEChampionshipTH"
+      }
+    ],
+    "Boxing": [
+      {
+        "handle": "@MatchroomBoxing"
+      },
+      {
+        "handle": "@TopRank"
+      },
+      {
+        "handle": "@GoldenBoyBoxing"
+      },
+      {
+        "handle": "@QueensberryPromotions"
+      },
+      {
+        "handle": "@DAZNBoxing"
+      },
+      {
+        "handle": "@ProBoxTV"
+      },
+      {
+        "handle": "@MostValuablePromotions"
+      },
+      {
+        "handle": "@BoxingonDAZN"
+      }
+    ],
+    "AFL": [
+      {
+        "handle": "@AFL"
+      },
+      {
+        "handle": "@AFLW"
+      }
+    ],
+    "NBA": [
+      {
+        "handle": "@NBA"
+      },
+      {
+        "handle": "@NBAGLeague"
+      }
+    ],
+    "NFL": [
+      {
+        "handle": "@NFL"
+      },
+      {
+        "handle": "@NFLonPrime"
+      }
+    ],
+    "Tennis": [
+      {
+        "handle": "@ATPTour"
+      },
+      {
+        "handle": "@WTA"
+      },
+      {
+        "handle": "@AustralianOpen"
+      },
+      {
+        "handle": "@TennisTV"
+      }
+    ]
   }
 }
