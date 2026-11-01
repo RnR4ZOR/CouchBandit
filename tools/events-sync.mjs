@@ -187,7 +187,7 @@ const hdr = { "content-type": "application/json", "x-sync-key": process.env.SYNC
 // results from the official channel list only, 3) look up the event's details (name, date/time, venue) on TheSportsDB.
 const SPORTSDB = process.env.SPORTSDB_KEY || "123";
 const catGuess = (...t) => { const s = t.join(" ").toLowerCase();
-  return /\bufc\b/.test(s) ? "UFC" : /\bone (championship|friday|fight)|\bone \d/.test(s) ? "ONE" : /boxing|matchroom|top rank|golden boy|queensberry/.test(s) ? "Boxing"
+  return /\bufc\b/.test(s) ? "UFC" : /\bone (championship|friday|fight)|\bone \d/.test(s) ? "ONE" : /boxing|matchroom|top rank|golden boy|queensberry|no limit/.test(s) ? "Boxing"
     : /\bafl\b|aussie rules|australian football/.test(s) ? "AFL" : /\bnba\b|basketball/.test(s) ? "NBA" : /\bnfl\b|american football/.test(s) ? "NFL" : /tennis|\batp\b|\bwta\b|open/.test(s) ? "Tennis" : ""; };
 async function eventInfo(q) {
   try {
