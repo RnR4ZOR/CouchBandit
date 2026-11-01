@@ -134,6 +134,20 @@ body.lockscroll{overflow:hidden}
 .player .hint a{pointer-events:auto;color:var(--accent);font-weight:700}
 .player .hint a{pointer-events:auto;color:var(--accent)}
 .srcbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.statsrow{display:flex;justify-content:flex-start;margin-top:-4px}
+.statsrow .btn{padding:8px 14px;font-size:14px}.statsrow .btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.statspip{position:absolute;top:12px;right:12px;z-index:4;width:min(300px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:rgba(12,12,12,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,212,0,.45);border-radius:16px;padding:10px 12px;font-size:13px;color:#fff;display:grid;gap:6px;opacity:0;transform:translateY(-8px) scale(.97);pointer-events:none;transition:opacity .22s ease,transform .22s cubic-bezier(.2,.8,.2,1)}
+.statspip.on{opacity:1;transform:none;pointer-events:auto}
+.statspip .sphead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.statspip .sphead b{color:var(--accent);font-weight:800;letter-spacing:.04em}
+.statspip .sphead button{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:999px;width:28px;height:28px;cursor:pointer;font-weight:700}
+.statspip .spnames,.statspip .sprow{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.statspip .spnames b{font-size:12px;line-height:1.2}.statspip .spnames b:last-child,.statspip .sprow span:last-child{text-align:right}
+.statspip .sprow{border-top:1px solid rgba(255,255,255,.08);padding-top:5px}
+.statspip .sprow small{color:rgba(255,255,255,.6);font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:center}
+.statspip .sprow span{font-weight:700;font-variant-numeric:tabular-nums}.statspip .sprow .lead{color:var(--accent)}
+.statspip .spmsg{color:rgba(255,255,255,.75)}
+@media (max-width:600px){.statspip{font-size:12px;padding:8px 10px;top:8px;right:8px}}
 .srcbar:empty{display:none}
 .chip{display:grid;gap:0;text-align:left;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:6px 12px;font:700 13px var(--body);cursor:pointer}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:middle;opacity:.6}
@@ -1033,7 +1047,8 @@ function room(r, si, ss) {
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button>${isOwner && r.id ? `<button class="btn alt" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}">${r.featured ? "★ Featured" : "☆ Feature"}</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" data-rm="${esc(r.id)}">Delete room</button>` : ""}<button class="btn alt" id="theaterBtn" aria-pressed="false">Theater</button><button class="btn alt" id="pipBtn" hidden>Pop out</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
   <div class="stage" id="stage">
     <div style="display:grid;gap:12px;min-width:0">
-      <div class="player" id="player"><button type="button" class="exitfs" id="exitFs">✕ Exit full screen</button></div>
+      <div class="player" id="player"><button type="button" class="exitfs" id="exitFs">✕ Exit full screen</button><div class="statspip" id="statsPip" role="dialog" aria-label="Live fight stats" aria-live="polite"></div></div>
+      <div class="statsrow" id="statsRow" hidden><button type="button" class="btn alt" id="statsBtn" aria-pressed="false">Live stats</button></div>
       <div class="srcbar" id="srcbar"></div>
       <div id="countdown" class="card" hidden></div>
       <form class="card" id="editor" hidden></form>
@@ -1111,6 +1126,7 @@ function room(r, si, ss) {
     if ($("#editBtn")) $("#editBtn").click();
   } else show(+si || 0, startSrc(+si || 0), true);
   matchday(r);
+  liveStats(r);
   clearInterval(timer);
   if (r.start && new Date(r.start) > new Date()) {
     const cd = $("#countdown"); cd.hidden = false; $("#liveTag").textContent = "Starting soon";
@@ -1133,14 +1149,49 @@ function room(r, si, ss) {
     const k = e.key.toLowerCase();
     if (k === "f") goFull();
     else if (k === "t") $("#theaterBtn")?.click();
+    else if (k === "s" && !$("#statsRow")?.hidden) $("#statsBtn")?.click();
     else if (k === "b") { auto = false; const n = sourcesOf(r.items[idx]).length; if (n > 1) show(idx, (src + 1) % n); else toast("This stream has no backups"); }
     else if (k === "n") { if (r.items.length > 1) show((idx + 1) % r.items.length, 0); else toast("Only one stream in this room"); }
   };
 }
 
+/* ===== Live fight stats: a pop-up over the player for UFC rooms. Shows only a fight in progress
+   (round, clock, running totals); finished fights are never shown, so nothing is spoiled.
+   It only checks for updates while it's open, every 20 seconds. ===== */
+function liveStats(r) {
+  const row = $("#statsRow"), pip = $("#statsPip"), btn = $("#statsBtn");
+  if (!row || !/\bufc\b/i.test(catOf(r) + " " + r.name + " " + (r.topic || ""))) return;
+  row.hidden = false;
+  const num = v => { const m = /^(\d+):(\d\d)$/.exec(v || ""); return m ? +m[1] * 60 + +m[2] : parseFloat(v) || 0; };
+  const ROWS = [["Sig. strikes", s => `${s.sigStrikesLanded}/${s.sigStrikesAttempted}`, s => num(s.sigStrikesLanded)],
+    ["Total strikes", s => s.totalStrikesLanded, s => num(s.totalStrikesLanded)],
+    ["Knockdowns", s => s.knockDowns, s => num(s.knockDowns)],
+    ["Takedowns", s => `${s.takedownsLanded}/${s.takedownsAttempted}`, s => num(s.takedownsLanded)],
+    ["Sub attempts", s => s.submissions, s => num(s.submissions)],
+    ["Control", s => s.timeInControl, s => num(s.timeInControl)]];
+  const head = t => `<div class="sphead"><b>${t}</b><button type="button" data-close aria-label="Close stats">✕</button></div>`;
+  const paint = d => {
+    if (!d || !d.live) { pip.innerHTML = head("Live stats") + `<div class="spmsg">${d && d.error ? "The stats feed isn't answering right now." : "No fight is live right now. Stats show here once the next bout starts."}</div>`; return; }
+    const [a, b] = d.fighters || [];
+    const top = head(`R${esc(String(d.round || "-"))}${d.clock ? " · " + esc(d.clock) : ""}`) + `<div class="spnames"><b>${esc(a?.name || "")}</b><span></span><b>${esc(b?.name || "")}</b></div>`;
+    if (!a?.stats || !b?.stats) { pip.innerHTML = top + `<div class="spmsg">Stats for this fight aren't out yet.</div>`; return; }
+    pip.innerHTML = top + ROWS.map(([l, show, n]) => { const x = n(a.stats), y = n(b.stats);
+      return `<div class="sprow"><span class="${x > y ? "lead" : ""}">${esc(String(show(a.stats) ?? "-"))}</span><small>${l}</small><span class="${y > x ? "lead" : ""}">${esc(String(show(b.stats) ?? "-"))}</span></div>`; }).join("");
+  };
+  const load = async () => {
+    if (!$("#statsPip")?.classList.contains("on")) return clearInterval(statsT);
+    try { const res = await fetch("api/fightstats", { cache: "no-store" }); paint(res.ok ? await res.json() : { error: 1 }); } catch (e) { paint({ error: 1 }); }
+  };
+  const open = on => {
+    pip.classList.toggle("on", on); btn.setAttribute("aria-pressed", on); clearInterval(statsT);
+    if (on) { pip.innerHTML = head("Live stats") + `<div class="spmsg">Loading…</div>`; load(); statsT = setInterval(load, 20000); }
+  };
+  btn.onclick = () => open(!pip.classList.contains("on"));
+  pip.onclick = e => { if (e.target.closest("[data-close]")) open(false); };
+}
 /* ===== Matchday: other games going on (one tap to switch rooms), live scores and the ladder for the room's sport.
    Scores stay blurred until you choose to see them; fight cards never show results. ===== */
-let mdT, mdTab = "rooms";
+let mdT, mdTab = "rooms", statsT;
 const MD_SPORTS = ["AFL", "NBA", "NFL", "UFC"];
 const scoresOn = () => { try { return localStorage.getItem("cb-scores") === "1"; } catch (e) { return false; } };
 async function matchday(r) {
@@ -1361,7 +1412,7 @@ async function saveSources(b) {
   finally { b.disabled = false; b.textContent = "Save sources"; }
 }
 async function route() {
-  clearInterval(timer); clearInterval(liveT); clearInterval(mdT); onkeydown = null; onvisibilitychange = null; app.onclick = null;
+  clearInterval(timer); clearInterval(liveT); clearInterval(mdT); clearInterval(statsT); onkeydown = null; onvisibilitychange = null; app.onclick = null;
   const h = location.hash || "#/";
   if (h.startsWith("#/r/")) {
     const [id, si, ss] = h.slice(4).split("/");
