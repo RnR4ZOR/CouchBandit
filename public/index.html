@@ -240,7 +240,7 @@ span.star{pointer-events:none}
 .mdpane{display:grid;gap:6px;animation:mdIn .3s cubic-bezier(.2,.8,.2,1)}
 @keyframes mdIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .mdrow{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;border:1px solid transparent;text-decoration:none;color:inherit;transition:background .2s,border-color .2s,transform .2s}
-a.mdrow:hover,a.mdrow:focus-visible,button.mdrow:hover,button.mdrow:focus-visible{background:var(--raise);border-color:var(--accent);transform:translateX(2px)}
+a.mdrow:hover,a.mdrow:focus-visible{background:var(--raise);border-color:var(--accent);transform:translateX(2px)}
 .mdrow .st{min-width:62px;text-align:center;font:800 10px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:5px;background:var(--raise);color:var(--muted);white-space:nowrap}
 .mdrow .st.live{background:var(--live);color:#fff}
 .mdrow .st.soon{background:var(--accent);color:var(--accent-ink)}
@@ -1013,7 +1013,7 @@ function switcherHTML(r) {
 
 function room(r, si, ss) {
   if (!r || !Array.isArray(r.items) || !r.items.length) { app.innerHTML = `<div class="empty">This room isn't available. It may have been removed.<br><br><a class="btn" href="#/">Back to rooms</a></div>`; return; }
-  let idx = 0, src = 0, gen = 0, goodT, seekNext = null; const link = roomLink(r);
+  let idx = 0, src = 0, gen = 0, goodT; const link = roomLink(r);
   /* no backup chosen in the link: Couch Bandit picks the best working one and keeps doing so until you pick one yourself */
   let auto = !(ss != null && ss !== "");
   recent.add(r.id);
@@ -1030,7 +1030,6 @@ function room(r, si, ss) {
       <form class="card" id="editor" hidden></form>
     </div>
     <aside class="side">
-      <div class="card" id="fightsCard" hidden><h3>Jump to a fight</h3><div id="fightsBody"></div><span class="note">Starts each bout from its walkout in the replay. No results.</span></div>
       <div class="card md" id="mdCard" hidden><h3>Matchday</h3><div class="mdtabs" role="tablist" id="mdTabs"><span class="pill" aria-hidden="true"></span></div><div id="mdBody"></div></div>
       <div class="card"><h3>Invite your mates</h3><div class="sharebox"><input id="shareLink" readonly value="${esc(link)}" aria-label="Room link" onfocus="this.select()"></div><span class="note">Anyone with this link can join. No account needed.</span></div>
       <div class="card"><h3>Streams</h3><ul class="queue" id="queue"></ul><span class="keys"><kbd>F</kbd> full screen · <kbd>T</kbd> theater · <kbd>B</kbd> next backup · <kbd>N</kbd> next stream</span></div>
@@ -1044,7 +1043,6 @@ function room(r, si, ss) {
   function show(i, s, quiet) {
     idx = Math.min(Math.max(0, i), r.items.length - 1); src = Math.min(Math.max(0, s), sourcesOf(r.items[idx]).length - 1);
     const p = parse(sourcesOf(r.items[idx])[src]);
-    if (seekNext != null && p.kind === "youtube" && p.id) p.start = seekNext; seekNext = null;
     const old = $("#player").querySelector(".layer"); old?._destroy?.();
     $("#player").querySelectorAll(".layer").forEach(l => l.remove());
     $("#player").insertAdjacentHTML("afterbegin", `<div class="layer on">${playerHTML(p)}</div>`);
@@ -1072,23 +1070,6 @@ function room(r, si, ss) {
     const chat = p.kind === "twitch" && p.channel ? `https://www.twitch.tv/embed/${encodeURIComponent(p.channel)}/chat?parent=${encodeURIComponent(host)}&darkpopout` : p.kind === "kick" ? `https://kick.com/popout/${encodeURIComponent(p.channel)}/chat` : "";
     $("#chatCard").hidden = !chat; if (chat && $("#chat").src !== chat) $("#chat").src = chat;
     if (!quiet && list.length > 1) toast(src === 0 ? "Main stream loaded" : "Backup " + src + " loaded");
-    replayFights();
-  }
-  /* UFC replays: once a YouTube live link has finished, the same link plays the replay. Each bout gets a link that starts
-     the replay at its walkout. Names only (no times shown, so how long a fight went never gives a result away). */
-  const fightCache = {};
-  async function replayFights() {
-    const card = $("#fightsCard"); if (!card || catOf(r) !== "UFC") return;
-    const list = sourcesOf(r.items[idx]), j = list.findIndex(u => { const q = parse(u); return q.kind === "youtube" && q.id; });
-    if (j < 0) { card.hidden = true; return; }
-    const yt = parse(list[j]).id, at = idx;
-    let d = fightCache[yt];
-    if (!d) { try { const res = await fetch("api/replay?yt=" + encodeURIComponent(yt)); d = res.ok ? await res.json() : null; } catch (e) {} if (d && !d.live) fightCache[yt] = d; }
-    if (at !== idx || !$("#fightsCard")) return;
-    const f = (d && d.fights) || [];
-    card.hidden = !f.length; if (!f.length) return;
-    $("#fightsBody").innerHTML = f.map((x, k) => `<button type="button" class="mdrow" data-seek="${k}" style="width:100%;background:none;font:inherit;text-align:left;cursor:pointer"><span class="st">${esc(/prelim/i.test(x.card) ? "Prelims" : /main/i.test(x.card) ? "Main" : "Bout")}</span><span><b>${esc(x.a + " vs " + x.b)}</b></span><span class="sc">▶</span></button>`).join("");
-    $("#fightsBody").onclick = e => { const b = e.target.closest("[data-seek]"); if (!b) return; seekNext = f[+b.dataset.seek].at; auto = false; show(idx, j, true); toast("Jumping to " + f[+b.dataset.seek].a + " vs " + f[+b.dataset.seek].b); };
   }
   $("#queue").addEventListener("click", e => { const b = e.target.closest("button"); if (b) goFull(), show(+b.dataset.i, auto ? startSrc(+b.dataset.i) : 0, true); });
   $("#srcbar").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; auto = false; goFull(); if (b.hasAttribute("data-reload")) show(idx, src); else show(idx, +b.dataset.s); });
