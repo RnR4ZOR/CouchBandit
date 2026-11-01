@@ -3,6 +3,7 @@
 // Combat sports (UFC) return the card only: fighter names and Live / Upcoming. Results are never sent, so nothing is spoiled.
 // UFC bout times and the LIVE flag come from Sportsbet, bout by bout (live-adjusted), with ESPN's schedule as the fallback.
 import { sportsbetUfc, sameFight } from "./_sportsbet.js";
+import { logLive } from "./_fightlog.js";
 const LEAGUES = {
   AFL: { path: "australian-football/afl", table: true },
   NBA: { path: "basketball/nba", table: true },
@@ -45,7 +46,7 @@ function withSportsbet(list, sb) {
   return out.sort((a, b) => String(a.start).localeCompare(String(b.start))).slice(0, 40);
 }
 
-export async function onRequestGet({ request }) {
+export async function onRequestGet({ request, env, waitUntil }) {
   const cat = (new URL(request.url).searchParams.get("cat") || "").toUpperCase();
   const lg = LEAGUES[cat];
   if (!lg) return new Response(JSON.stringify({ cat, games: [], table: [] }), { headers: { ...headers, "cache-control": "public, max-age=3600" } });
@@ -55,6 +56,6 @@ export async function onRequestGet({ request }) {
     lg.table ? get(`${base}/v2/sports/${lg.path}/standings`, 1800) : Promise.resolve(null)
   ]);
   const body = { cat, fights: !!lg.fights, games: g.status === "fulfilled" ? games(g.value, lg.fights) : [], table: t.status === "fulfilled" && t.value ? table(t.value) : [] };
-  if (cat === "UFC") body.games = withSportsbet(body.games, await sportsbetUfc());
+  if (cat === "UFC") { const sb = await sportsbetUfc(); body.games = withSportsbet(body.games, sb); if (waitUntil) waitUntil(logLive(env, sb)); }
   return new Response(JSON.stringify(body), { headers: { ...headers, "cache-control": "public, max-age=60" } });
 }

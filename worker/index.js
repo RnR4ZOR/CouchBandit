@@ -10,10 +10,14 @@ import * as rooms from "../functions/api/rooms.js";
 import * as sources from "../functions/api/sources.js";
 import * as stream from "../functions/api/stream.js";
 import * as sync from "../functions/api/sync.js";
+import * as replay from "../functions/api/replay.js";
+import { cronLog } from "../functions/api/_fightlog.js";
 
-const routes = { check, extract, login, matchday, requests, rooms, sources, stream, sync };
+const routes = { check, extract, login, matchday, replay, requests, rooms, sources, stream, sync };
 
 export default {
+  // Every 2 minutes: log the moment each UFC bout goes LIVE (does nothing unless an event is on).
+  async scheduled(event, env, ctx) { ctx.waitUntil(cronLog(env)); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const m = url.pathname.match(/^\/api\/([a-z]+)\/?$/);
