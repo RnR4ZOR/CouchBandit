@@ -180,7 +180,6 @@ span.star{pointer-events:none}
 .ix{position:fixed;top:0;left:0;bottom:0;z-index:41;width:min(300px,86vw);background:var(--bg);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;overflow-x:hidden;
   transform:translateX(-104%);transition:transform .38s cubic-bezier(.2,.8,.2,1),width .3s cubic-bezier(.2,.8,.2,1);box-shadow:20px 0 50px rgba(0,0,0,.25)}
 .ixgo .lv{width:8px;height:8px;border-radius:50%;background:#e5484d;box-shadow:0 0 0 3px color-mix(in srgb,#e5484d 25%,transparent);flex:none;margin-left:auto;animation:lvp 1.8s ease-in-out infinite}
-.secthead .lv,.chip .lv{display:inline-block;width:9px;height:9px;border-radius:50%;background:#e5484d;box-shadow:0 0 0 3px color-mix(in srgb,#e5484d 25%,transparent);margin-right:8px;vertical-align:middle;animation:lvp 1.8s ease-in-out infinite}
 @keyframes lvp{50%{box-shadow:0 0 0 6px transparent}}
 .ixmini{display:none}
 /* Desktop: docked guide like Twitch/YouTube, collapsible to an icon rail */
@@ -289,7 +288,7 @@ body.tv .tvhint{display:flex}
     <a class="ixgo" href="#/" data-ix data-jump="mineSec"><b>♥</b><span class="t">My teams</span><em id="ixMine"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="live"><b>●</b><span class="t">Live now</span><em id="ixLive"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="soon"><b>◷</b><span class="t">Upcoming</span><em id="ixSoon"></em></a>
-    <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Starred</span><em id="ixFeat"></em></a>
+    <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Featured</span><em id="ixFeat"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="draftSec" id="ixDraftGo" hidden><b>✎</b><span class="t">Needs links</span><em id="ixDraft"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="archiveSec"><b>▤</b><span class="t">Past events</span><em id="ixPast"></em></a>
   </div>
@@ -533,11 +532,7 @@ const sourcesOf = it => [it.url, ...(it.backups || [])].filter(Boolean);
 const COLORS = [["#1d1a0c", "#3d3300"], ["#121212", "#2e2a14"], ["#2a2200", "#0d0d0d"], ["#191714", "#433800"], ["#0f0f0f", "#332b05"]];
 const thumbBg = name => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const [a, b] = COLORS[h % COLORS.length]; return `repeating-linear-gradient(-45deg,rgba(255,212,0,.06) 0 10px,transparent 10px 20px),linear-gradient(${120 + h % 60}deg,${a},${b})`; };
 const initials = n => n.split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
-/* live = started in the last 6 hours; a room with no start time counts from when it was added */
-const liveFrom = r => r.start && !isNaN(new Date(r.start)) ? new Date(r.start).getTime() : +r.created || 0;
-const isLive = r => { const t = liveFrom(r); return !!t && t <= Date.now() && Date.now() - t < 6 * HOUR; };
-/* Live rooms take the starred spots for the day they're on; the owner's own stars follow */
-const dayStar = r => isLive(r) || (liveFrom(r) <= Date.now() && new Date(liveFrom(r)).toDateString() === new Date().toDateString());
+const isLive = r => r.start && new Date(r.start) <= new Date() && Date.now() - new Date(r.start) < 6 * HOUR;
 const isSoon = r => r.start && new Date(r.start) > new Date() && new Date(r.start) - Date.now() < 3 * HOUR;
 /* Always newest to oldest (by event time, else when the room was added) */
 const sorted = list => [...list].sort((a, b) => roomTime(b) - roomTime(a));
@@ -674,7 +669,7 @@ function ixFill() {
   const act = ready().filter(r => !isArchived(r));
   n("#ixDraft", ROOMS.filter(r => r.draft).length);
   n("#ixLive", act.filter(isLive).length); n("#ixSoon", act.filter(r => r.start && new Date(r.start) > new Date()).length);
-  n("#ixFeat", ready().filter(r => r.featured || (!isArchived(r) && dayStar(r))).length); n("#ixPast", ROOMS.filter(isArchived).length);
+  n("#ixFeat", ROOMS.filter(r => r.featured).length); n("#ixPast", ROOMS.filter(isArchived).length);
   const fv = favs.get(); n("#ixMine", act.filter(r => isFav(r, fv)).length);
   $("#ixRooms").innerHTML = act.length ? sorted(act).map(r => `<a class="ixgo" href="${roomHref(r)}" data-ix title="${esc(r.name)}"><b>${r.featured ? "★" : esc(initials(r.name))}</b><span>${esc(r.name)}</span>${isLive(r) ? `<i class="lv" aria-label="live"></i>` : ""}</a>`).join("") : `<span class="note" style="padding:8px 10px">No current rooms</span>`;
   loadReqs().then(l => n("#ixReqN", (l || []).filter(q => !["done", "declined"].includes(q.status)).length));
@@ -705,8 +700,6 @@ $("#ixMenu").addEventListener("click", e => {
   e.preventDefault();
   const go = () => {
     if (j === "top") return scrollTo({ top: 0, behavior: "smooth" });
-    if (j === "live" && $("#liveSec") && !$("#liveSec").hidden) return $("#liveSec").scrollIntoView({ behavior: "smooth" });
-    if (j === "featured" && $("#featured") && !$("#featured").hidden) return $("#featured").scrollIntoView({ behavior: "smooth" });
     if (j === "live" || j === "soon" || j === "featured") { const b = $(`#filters [data-filter="${j}"]`); if (b) b.click(); return $("#rooms")?.scrollIntoView({ behavior: "smooth" }); }
     const el = $("#" + j); if (el && !el.hidden) { el.scrollIntoView({ behavior: "smooth" }); el.querySelector("details")?.setAttribute("open", ""); } else toast("Nothing filed there yet");
   };
@@ -848,18 +841,6 @@ function sportPage(cat) {
 }
 function home() {
   app.innerHTML = `
-  <section id="liveSec" hidden>
-    <div class="secthead"><h2><i class="lv" aria-hidden="true"></i> Live now</h2><span class="note">On right now, newest first</span></div>
-    <div id="liveList"></div>
-  </section>
-  <section id="sportsSec" hidden>
-    <div class="secthead"><h2>Sports</h2><span class="note">Each sport's own page</span></div>
-    <nav class="filters cats" id="sportLinks" aria-label="Sports"></nav>
-  </section>
-  <section id="featured" hidden>
-    <div class="secthead"><h2>Starred</h2><span class="note">Today's live events first, then the owner's picks</span></div>
-    <div id="featList"></div>
-  </section>
   <section class="hero solo">
     <div style="display:grid;gap:14px;align-content:start">
       <h1>Pull up a couch. <em>Pick a room.</em></h1>
@@ -875,6 +856,10 @@ function home() {
       <div class="favs" id="favTeams" role="group" aria-label="Your teams"></div>
     </div>
     <div id="mineList"></div>
+  </section>
+  <section id="featured" hidden>
+    <div class="secthead"><h2>Featured rooms</h2><span class="note">Picked by the owner</span></div>
+    <div id="featList"></div>
   </section>
   <section id="recentSec" hidden>
     <div class="secthead"><h2>Jump back in</h2><span class="note">Rooms you opened on this device</span></div>
@@ -894,14 +879,7 @@ function home() {
     <div id="archiveList" class="files"></div>
   </section>`;
   const paint = () => { const box = $("#roomList"); if (!box) return;
-    const live = sorted(ready().filter(r => !isArchived(r) && isLive(r)));
-    $("#liveSec").hidden = !live.length; $("#liveList").innerHTML = live.length ? `<div class="rooms">${live.map(roomCard).join("")}</div>` : "";
-    const allR = ready(), sp = [...new Set(allR.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
-    $("#sportsSec").hidden = !sp.length;
-    $("#sportLinks").innerHTML = sp.map(c => { const n = allR.filter(r => catOf(r) === c), on = n.filter(r => !isArchived(r) && isLive(r)).length;
-      return `<a class="chip" href="${sportHref(c)}" style="text-decoration:none">${on ? `<i class="lv" aria-label="${on} live"></i>` : ""}${esc(c === "Other" ? "Other" : c)}<small>${n.length} room${n.length === 1 ? "" : "s"}${on ? " · " + on + " live" : ""}</small></a>`; }).join("");
-    const today = sorted(allR.filter(r => !isArchived(r) && dayStar(r))), feat = [...today, ...sorted(allR.filter(r => r.featured && !today.includes(r)))];
-    $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
+    const feat = sorted(ready().filter(r => r.featured)); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
     paintMine();
     const rec = recent.get().map(byId).filter(r => r && !r.draft); $("#recentSec").hidden = !rec.length; $("#recentList").innerHTML = rec.length ? `<div class="rooms">${rec.slice(0, 3).map(roomCard).join("")}</div>` : "";
     const q = ($("#roomSearch")?.value || "").trim().toLowerCase();
