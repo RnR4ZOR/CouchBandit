@@ -124,6 +124,7 @@ body.lockscroll{overflow:hidden}
 .player .unmute{position:absolute;right:12px;top:12px;z-index:2}
 .player .hint{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:12px;color:var(--muted);background:linear-gradient(transparent,rgba(0,0,0,.85));pointer-events:none;opacity:0;transition:opacity .3s}
 .player:hover .hint{opacity:1}
+.player .hint a{pointer-events:auto;color:var(--accent);font-weight:700}
 .player .hint a{pointer-events:auto;color:var(--accent)}
 .srcbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .srcbar:empty{display:none}
@@ -406,7 +407,7 @@ function playerHTML(p, m) {
     case "vimeo": return `<iframe ${SB} src="https://player.vimeo.com/video/${esc(p.id)}?${p.hash ? "h=" + esc(p.hash) + "&" : ""}autoplay=1&muted=${m ? 1 : 0}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Vimeo player"></iframe>`;
     case "hls": case "dash": case "flv": case "mpegts": case "file": return `<video controls playsinline autoplay ${m ? "muted" : ""}></video><div class="engine" data-engine>Loading ${esc(p.label)}…</div><button type="button" class="btn sm unmute" data-unmute hidden>Tap for sound</button>`;
     case "nobrowser": return `<div class="msg"><div style="display:grid;gap:8px;justify-items:center;max-width:420px"><b>${esc(p.label)}</b><span>Web browsers can't play this type of stream. Pick a backup, or ask for an HLS (.m3u8) link instead.</span></div></div>`;
-    case "embed": return `<iframe ${SB} src="${esc(p.url)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="origin" title="Video player"></iframe><div class="hint">Blank screen? That site blocks other sites from showing its player. Try a backup.</div>`;
+    case "embed": return `<iframe ${SB} src="${esc(p.url)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="origin" title="Video player"></iframe><div class="hint">Blank screen? That site blocks other sites from showing its player. Try a backup, or <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">open it in a new tab ↗</a>.</div>`;
     default: return `<div class="msg">That link doesn't look right. Check it and try again.</div>`;
   }
 }
@@ -1065,7 +1066,7 @@ function room(r, si, ss) {
       if (linkRank(cs[b]) >= 2) $(`#srcbar [data-s="${b}"] span`)?.insertAdjacentHTML("beforeend", `<em class="pick">best</em>`);
       if (auto && b !== src && linkRank(cs[src]) < 2 && linkRank(cs[b]) >= 2) { toast("Switched to the best working link"); show(idx, b, true); }
     });
-    $("#srcbar").innerHTML = `<span class="note">Now playing</span>` + list.map((u, j) => { const q = parse(u); return `<button type="button" class="chip" data-s="${j}" aria-pressed="${j === src}"><span><i class="dot" data-dot="${esc(u)}"></i>${j === 0 ? "Main" : "Backup " + j}</span><small>${esc(q.label || "Link")}</small></button>`; }).join("") + `<button type="button" class="chip" data-reload>Reload<small>same source</small></button>`;
+    $("#srcbar").innerHTML = `<span class="note">Now playing</span>` + list.map((u, j) => { const q = parse(u); return `<button type="button" class="chip" data-s="${j}" aria-pressed="${j === src}"><span><i class="dot" data-dot="${esc(u)}"></i>${j === 0 ? "Main" : "Backup " + j}</span><small>${esc(q.label || "Link")}</small></button>`; }).join("") + `<button type="button" class="chip" data-reload>Reload<small>same source</small></button><a class="chip" href="${esc(list[src])}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Open ↗<small>new tab</small></a>`;
     $("#queue").innerHTML = r.items.map((it, j) => { const q = parse(it.url); const nb = (it.backups || []).length; return `<li><button data-i="${j}" aria-current="${j === idx}"><b>${esc(it.title)}</b><small>${esc(q.label || "Link")}${q.channel ? " · " + esc(q.channel) : ""}${nb ? " · " + nb + (nb === 1 ? " backup" : " backups") : ""}</small></button></li>`; }).join("");
     const chat = p.kind === "twitch" && p.channel ? `https://www.twitch.tv/embed/${encodeURIComponent(p.channel)}/chat?parent=${encodeURIComponent(host)}&darkpopout` : p.kind === "kick" ? `https://kick.com/popout/${encodeURIComponent(p.channel)}/chat` : "";
     $("#chatCard").hidden = !chat; if (chat && $("#chat").src !== chat) $("#chat").src = chat;
