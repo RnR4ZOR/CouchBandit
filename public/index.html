@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>
+/* One home for Couch Bandit: the old GitHub Pages and workers.dev addresses forward to couchbandit.pages.dev,
+   keeping any room link (#/r/...), so everyone sees the same server-saved rooms. */
+(function () { var h = location.hostname;
+  if (h === "rnr4zor.github.io" || /\.workers\.dev$/.test(h)) location.replace("https://couchbandit.pages.dev/" + location.search + location.hash);
+})();
+</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Couch Bandit</title>
 <meta name="description" content="Pick a room, hit play, watch with your mates.">
@@ -641,7 +648,9 @@ async function login(user, pass) {
       const j = await r.json();
       if (r.ok && j.pass) { setPass(j.pass); isOwner = true; return true; }
     } catch (e) {}
-    /* owner login not set up on the server yet: fall through to the built-in check */
+    /* On Cloudflare, never fall back to the old GitHub login: it would save rooms to GitHub,
+       where visitors on this site can't see them. */
+    return "server";
   }
   const h = hex(await pbkdf2(user + ":" + pass, OWNER.salt, OWNER.iter));
   if (h !== OWNER.hash) return false;
@@ -715,6 +724,7 @@ $("#loginForm").addEventListener("submit", async e => {
   const b = $("#lg_go"); b.disabled = true; $("#lg_msg").textContent = "Checking…";
   const ok = await login("master", $("#lg_pass").value);
   b.disabled = false;
+  if (ok === "server") { $("#lg_msg").textContent = "Couldn't reach the room server, so rooms wouldn't save for everyone. Try again in a minute."; return; }
   if (!ok) { $("#lg_msg").textContent = "That master code isn't right."; return; }
   $("#loginBox").hidden = true; paintNav(); route(); toast("Unlocked — you're the master now");
 });
