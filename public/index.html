@@ -1150,7 +1150,7 @@ async function matchday(r) {
       const g = data?.games || []; if (!g.length) return `<div class="empty">No ${esc(cat)} games this week.</div>`;
       if (data.fights) {
         const evs = [...new Set(g.map(x => x.event))];
-        return evs.map(ev => `<div class="mdlbl"><span>${esc(ev)}</span></div>` + g.filter(x => x.event === ev).map(x => `<div class="mdrow"><span class="st ${x.state === "live" ? "live" : x.state === "soon" ? "soon" : ""}">${x.state === "live" ? "Live" : x.state === "done" ? "Done" : esc(when(x.start))}</span><span><b>${esc(x.sides.map(s => s.name).join(" vs "))}</b></span><span></span></div>`).join("")).join("");
+        return evs.map(ev => `<div class="mdlbl"><span>${esc(ev)}</span>${g.some(x => x.event === ev && x.times === "sportsbet") ? `<small class="note">Live times · Sportsbet</small>` : ""}</div>` + g.filter(x => x.event === ev).map(x => `<div class="mdrow"><span class="st ${x.state === "live" ? "live" : x.state === "soon" ? "soon" : ""}">${x.state === "live" ? "Live" : x.state === "done" ? "Done" : esc(when(x.start))}</span><span><b>${esc(x.sides.map(s => s.name).join(" vs "))}</b></span><span></span></div>`).join("")).join("");
       }
       const on = scoresOn();
       return `<div class="mdlbl"><span>${esc(cat)} · this round</span><button type="button" id="mdSpoil">${on ? "Hide scores" : "Show scores"}</button></div>` + g.map(x => {
