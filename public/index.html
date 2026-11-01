@@ -1039,9 +1039,9 @@ function room(r, si, ss) {
       <form class="card" id="editor" hidden></form>
     </div>
     <aside class="side">
+      <div class="card"><h3>Streams</h3><ul class="queue" id="queue"></ul><span class="keys"><kbd>F</kbd> full screen · <kbd>T</kbd> theater · <kbd>B</kbd> next backup · <kbd>N</kbd> next stream</span></div>
       <div class="card md" id="mdCard" hidden><h3>Matchday</h3><div class="mdtabs" role="tablist" id="mdTabs"><span class="pill" aria-hidden="true"></span></div><div id="mdBody"></div></div>
       <div class="card"><h3>Invite your mates</h3><div class="sharebox"><input id="shareLink" readonly value="${esc(link)}" aria-label="Room link" onfocus="this.select()"></div><span class="note">Anyone with this link can join. No account needed.</span></div>
-      <div class="card"><h3>Streams</h3><ul class="queue" id="queue"></ul><span class="keys"><kbd>F</kbd> full screen · <kbd>T</kbd> theater · <kbd>B</kbd> next backup · <kbd>N</kbd> next stream</span></div>
       <div class="card" id="chatCard" hidden><h3>Chat</h3><iframe class="chatframe" id="chat" sandbox="allow-scripts allow-same-origin allow-forms" title="Stream chat"></iframe></div>
     </aside>
   </div>`;
