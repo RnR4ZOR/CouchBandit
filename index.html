@@ -147,6 +147,12 @@ body.lockscroll{overflow:hidden}
 .statspip .sprow small{color:rgba(255,255,255,.6);font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:center}
 .statspip .sprow span{font-weight:700;font-variant-numeric:tabular-nums}.statspip .sprow .lead{color:var(--accent)}
 .statspip .spmsg{color:rgba(255,255,255,.75)}
+.statspip .spcover{display:grid;gap:4px;justify-items:center;text-align:center;padding:14px 6px;border-radius:12px;background:repeating-linear-gradient(-45deg,rgba(255,212,0,.08) 0 10px,transparent 10px 20px)}
+.statspip .spcover span{font-size:11px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.05em}
+.statspip .spcover small{color:rgba(255,255,255,.7)}.statspip .spcover .btn{margin-top:6px;padding:8px 14px;font-size:13px}
+.statspip .spfight{display:flex;justify-content:space-between;gap:8px;align-items:center;width:100%;text-align:left;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:7px 9px;color:#fff;font:inherit;cursor:pointer;transition:background .15s}
+.statspip .spfight:hover,.statspip .spfight[aria-expanded="true"]{background:rgba(255,212,0,.12)}
+.statspip .spfight b{color:var(--accent)}.statspip .spfight small{color:rgba(255,255,255,.6);white-space:nowrap}
 @media (max-width:600px){.statspip{font-size:12px;padding:8px 10px;top:8px;right:8px}}
 .srcbar:empty{display:none}
 .chip{display:grid;gap:0;text-align:left;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:6px 12px;font:700 13px var(--body);cursor:pointer}
@@ -1048,7 +1054,7 @@ function room(r, si, ss) {
   <div class="stage" id="stage">
     <div style="display:grid;gap:12px;min-width:0">
       <div class="player" id="player"><button type="button" class="exitfs" id="exitFs">✕ Exit full screen</button><div class="statspip" id="statsPip" role="dialog" aria-label="Live fight stats" aria-live="polite"></div></div>
-      <div class="statsrow" id="statsRow" hidden><button type="button" class="btn alt" id="statsBtn" aria-pressed="false">Live stats</button></div>
+      <div class="statsrow" id="statsRow" hidden><button type="button" class="btn alt" id="statsBtn" aria-pressed="false">Fight stats</button></div>
       <div class="srcbar" id="srcbar"></div>
       <div id="countdown" class="card" hidden></div>
       <form class="card" id="editor" hidden></form>
@@ -1162,6 +1168,9 @@ function liveStats(r) {
   const row = $("#statsRow"), pip = $("#statsPip"), btn = $("#statsBtn");
   if (!row || !/\bufc\b/i.test(catOf(r) + " " + r.name + " " + (r.topic || ""))) return;
   row.hidden = false;
+  /* the room's event date in US Eastern time, which is how ESPN dates UFC cards */
+  let date = ""; try { const t = new Date(r.start || r.created); if (!isNaN(t)) date = t.toLocaleDateString("en-CA", { timeZone: "America/New_York" }); } catch (e) {}
+  let last = null, revealed = false, openF = -1; const fstats = {};
   const num = v => { const m = /^(\d+):(\d\d)$/.exec(v || ""); return m ? +m[1] * 60 + +m[2] : parseFloat(v) || 0; };
   const ROWS = [["Sig. strikes", s => `${s.sigStrikesLanded}/${s.sigStrikesAttempted}`, s => num(s.sigStrikesLanded)],
     ["Total strikes", s => s.totalStrikesLanded, s => num(s.totalStrikesLanded)],
@@ -1170,24 +1179,46 @@ function liveStats(r) {
     ["Sub attempts", s => s.submissions, s => num(s.submissions)],
     ["Control", s => s.timeInControl, s => num(s.timeInControl)]];
   const head = t => `<div class="sphead"><b>${t}</b><button type="button" data-close aria-label="Close stats">✕</button></div>`;
+  const table = (sa, sb) => ROWS.map(([l, show, n]) => { const x = n(sa), y = n(sb);
+    return `<div class="sprow"><span class="${x > y ? "lead" : ""}">${esc(String(show(sa) ?? "-"))}</span><small>${l}</small><span class="${y > x ? "lead" : ""}">${esc(String(show(sb) ?? "-"))}</span></div>`; }).join("");
+  const results = res => {
+    if (!revealed) return head("Results") + `<div class="spcover"><span>${esc(res.event)}</span><b>Results hidden</b><small>No spoilers until you tap.</small><button type="button" class="btn" data-reveal>Show results</button></div>`;
+    return head("Results") + `<div class="spmsg">${esc(res.event)} · tap a fight for its stats</div>` + res.fights.map((f, i) => {
+      const w = f.a.winner ? f.a : f.b.winner ? f.b : null, l = w === f.a ? f.b : f.a, st = fstats[f.comp];
+      return `<button type="button" class="spfight" data-f="${i}" aria-expanded="${openF === i}"><span>${w ? `<b>${esc(w.name)}</b> def. ${esc(l.name)}` : `${esc(f.a.name)} vs ${esc(f.b.name)} · no winner listed`}</span><small>R${f.round}${f.clock && f.clock !== "-" ? " · " + esc(f.clock) : ""}</small></button>`
+        + (openF === i ? (st === "load" ? `<div class="spmsg">Loading…</div>` : st && st[0] && st[1] ? `<div class="spnames"><b>${esc(f.a.name)}</b><span></span><b>${esc(f.b.name)}</b></div>` + table(st[0], st[1]) : `<div class="spmsg">No stats for this fight.</div>`) : "");
+    }).join("");
+  };
   const paint = d => {
-    if (!d || !d.live) { pip.innerHTML = head("Live stats") + `<div class="spmsg">${d && d.error ? "The stats feed isn't answering right now." : "No fight is live right now. Stats show here once the next bout starts."}</div>`; return; }
-    const [a, b] = d.fighters || [];
-    const top = head(`R${esc(String(d.round || "-"))}${d.clock ? " · " + esc(d.clock) : ""}`) + `<div class="spnames"><b>${esc(a?.name || "")}</b><span></span><b>${esc(b?.name || "")}</b></div>`;
-    if (!a?.stats || !b?.stats) { pip.innerHTML = top + `<div class="spmsg">Stats for this fight aren't out yet.</div>`; return; }
-    pip.innerHTML = top + ROWS.map(([l, show, n]) => { const x = n(a.stats), y = n(b.stats);
-      return `<div class="sprow"><span class="${x > y ? "lead" : ""}">${esc(String(show(a.stats) ?? "-"))}</span><small>${l}</small><span class="${y > x ? "lead" : ""}">${esc(String(show(b.stats) ?? "-"))}</span></div>`; }).join("");
+    last = d;
+    if (d && d.live) {
+      const [a, b] = d.fighters || [];
+      const top = head(`R${esc(String(d.round || "-"))}${d.clock ? " · " + esc(d.clock) : ""}`) + `<div class="spnames"><b>${esc(a?.name || "")}</b><span></span><b>${esc(b?.name || "")}</b></div>`;
+      pip.innerHTML = top + (a?.stats && b?.stats ? table(a.stats, b.stats) : `<div class="spmsg">Stats for this fight aren't out yet.</div>`); return;
+    }
+    if (d && d.results && d.results.fights.length) { pip.innerHTML = results(d.results); return; }
+    pip.innerHTML = head("Fight stats") + `<div class="spmsg">${d && d.error ? "The stats feed isn't answering right now." : "No fight is live right now. Stats show here once the next bout starts."}</div>`;
   };
   const load = async () => {
     if (!$("#statsPip")?.classList.contains("on")) return clearInterval(statsT);
-    try { const res = await fetch("api/fightstats", { cache: "no-store" }); paint(res.ok ? await res.json() : { error: 1 }); } catch (e) { paint({ error: 1 }); }
+    try { const res = await fetch("api/fightstats" + (date ? "?date=" + date : ""), { cache: "no-store" }); paint(res.ok ? await res.json() : { error: 1 }); } catch (e) { paint({ error: 1 }); }
   };
   const open = on => {
     pip.classList.toggle("on", on); btn.setAttribute("aria-pressed", on); clearInterval(statsT);
-    if (on) { pip.innerHTML = head("Live stats") + `<div class="spmsg">Loading…</div>`; load(); statsT = setInterval(load, 20000); }
+    if (on) { pip.innerHTML = head("Fight stats") + `<div class="spmsg">Loading…</div>`; load(); statsT = setInterval(load, 20000); }
   };
   btn.onclick = () => open(!pip.classList.contains("on"));
-  pip.onclick = e => { if (e.target.closest("[data-close]")) open(false); };
+  pip.onclick = async e => {
+    if (e.target.closest("[data-close]")) return open(false);
+    if (e.target.closest("[data-reveal]")) { revealed = true; return paint(last); }
+    const fb = e.target.closest("[data-f]"); if (!fb || !last?.results) return;
+    const i = +fb.dataset.f, f = last.results.fights[i]; openF = openF === i ? -1 : i;
+    if (openF === i && !fstats[f.comp]) {
+      fstats[f.comp] = "load"; paint(last);
+      try { const res = await fetch(`api/fightstats?ev=${last.results.ev}&comp=${f.comp}&a=${f.a.id}&b=${f.b.id}`); fstats[f.comp] = res.ok ? (await res.json()).stats : null; } catch (x) { fstats[f.comp] = null; }
+    }
+    paint(last);
+  };
 }
 /* ===== Matchday: other games going on (one tap to switch rooms), live scores and the ladder for the room's sport.
    Scores stay blurred until you choose to see them; fight cards never show results. ===== */
