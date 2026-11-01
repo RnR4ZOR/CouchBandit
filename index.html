@@ -1042,6 +1042,9 @@ function switcherHTML(r) {
 
 function room(r, si, ss) {
   if (!r || !Array.isArray(r.items) || !r.items.length) { app.innerHTML = `<div class="empty">This room isn't available. It may have been removed.<br><br><a class="btn" href="#/">Back to rooms</a></div>`; return; }
+  /* Streams order: Early prelims first, then Prelims, then the main card and anything else (kept in their own order) */
+  const cardRank = t => /early[\s-]*prelim/i.test(t) ? 0 : /prelim/i.test(t) ? 1 : 2;
+  r = { ...r, items: r.items.map((it, k) => [it, k]).sort((x, y) => cardRank(x[0].title) - cardRank(y[0].title) || x[1] - y[1]).map(x => x[0]) };
   let idx = 0, src = 0, gen = 0, goodT; const link = roomLink(r);
   /* no backup chosen in the link: Couch Bandit picks the best working one and keeps doing so until you pick one yourself */
   let auto = !(ss != null && ss !== "");
