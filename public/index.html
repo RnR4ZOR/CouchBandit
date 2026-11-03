@@ -970,9 +970,10 @@ const readStreams = box => [...box.querySelectorAll("[data-row]")].map((row, j) 
   backups: [...row.querySelectorAll('[data-f="backup"]')].map(i => cleanLink(i.value)).filter(Boolean)
 }));
 function bindStreams(box) {
-  const rows = box.querySelector("[data-rows]");
   box.addEventListener("click", e => {
+    const rows = box.querySelector("[data-rows]"); /* looked up on each click: the room editor is filled in after this is bound */
     const t = e.target, row = t.closest("[data-row]");
+    if (!rows) return;
     if (t.hasAttribute("data-bkadd")) { const l = row.querySelector("[data-bks]"); l.insertAdjacentHTML("beforeend", backupInput("", l.children.length)); l.lastElementChild.querySelector("input").focus(); return; }
     if (t.hasAttribute("data-bkdel")) { t.closest("[data-bk]").remove(); return; }
     if (t.hasAttribute("data-addstream")) { rows.insertAdjacentHTML("beforeend", streamRow({}, rows.children.length)); return; }
