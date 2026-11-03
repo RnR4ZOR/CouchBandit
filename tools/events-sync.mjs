@@ -24,7 +24,7 @@ const log = (...a) => console.log(...a);
 
 async function get(url, type = "text") {
   const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(15000) });
-  if (!r.ok) throw new Error(r.status + " " + url.replace(KEY, "KEY"));
+  if (!r.ok) throw new Error(r.status + " " + (KEY ? url.replace(KEY, "KEY") : url));
   return type === "json" ? r.json() : r.text();
 }
 const api = (path, q) => get(`https://www.googleapis.com/youtube/v3/${path}?${new URLSearchParams({ ...q, key: KEY })}`, "json");
@@ -56,8 +56,9 @@ async function recentIds(cid) {
 async function liveInfo(ids) {
   if (!ids.length) return [];
   if (KEY) {
-    const j = await api("videos", { part: "snippet,liveStreamingDetails", id: ids.join(",") });
-    return (j.items || []).filter(v => v.liveStreamingDetails && !v.liveStreamingDetails.actualEndTime && v.snippet.liveBroadcastContent !== "none")
+    const j = await api("videos", { part: "snippet,liveStreamingDetails,contentDetails", id: ids.join(",") });
+    // live broadcasts only: a premiere (a pre-recorded clip shown "live") has a real length, a true live stream has none
+    return (j.items || []).filter(v => v.liveStreamingDetails && !v.liveStreamingDetails.actualEndTime && v.snippet.liveBroadcastContent !== "none" && /^P0D$|^PT0S$/.test(v.contentDetails?.duration || "P0D"))
       .map(v => ({ id: v.id, title: v.snippet.title, start: v.liveStreamingDetails.actualStartTime || v.liveStreamingDetails.scheduledStartTime, live: v.snippet.liveBroadcastContent === "live" }));
   }
   const out = [];
@@ -66,6 +67,8 @@ async function liveInfo(ids) {
       const html = await get("https://www.youtube.com/watch?v=" + id);
       const d = (html.match(/"liveBroadcastDetails":\{([^}]*)\}/) || [])[1];
       if (!d || /"endTimestamp"/.test(d)) continue;
+      // live broadcasts only: premieres are pre-recorded clips (isLiveContent false, with a length)
+      if (!/"isLiveContent":true/.test(html) || +((html.match(/"lengthSeconds":"(\d+)"/) || [])[1] || 0) > 0) continue;
       const start = (d.match(/"startTimestamp":"([^"]+)"/) || [])[1];
       const title = JSON.parse('"' + ((html.match(/"videoDetails":\{"videoId":"[\w-]{11}","title":"((?:[^"\\]|\\.)*)"/) || [])[1] || "Live stream") + '"');
       if (start) out.push({ id, title, start, live: /"isLiveNow":true/.test(d) });
@@ -95,84 +98,109 @@ for (const [cat, chans] of Object.entries(cfg.categories)) {
   }
 }
 
-// Same event on several channels (same category, within 2 hours, similar title) -> one room, others as backups
+// Rooms are built from the schedule below (empty slots the owner fills). Only true live broadcasts from the official
+// channels are used to fill them; premieres, clips, highlights and teasers are never used (owner's rule: full streams
+// or live channels showing the event only).
 const rooms = [];
-for (const e of found.sort((a, b) => new Date(a.start) - new Date(b.start))) {
-  const url = "https://www.youtube.com/watch?v=" + e.id;
-  const r = rooms.find(r => r.cat === e.cat && Math.abs(new Date(r.start) - new Date(e.start)) < 2 * HOUR && alike(r.name, e.title));
-  if (r) { const b = r.items[0].backups; if (b.length < MAX_BACKUPS && !b.includes(url)) b.push(url); continue; }
-  rooms.push(roomOf(e));
-}
-for (const r of rooms) r.items[0].backups = r.items[0].backups.slice(0, MAX_BACKUPS);
 
-// ===== Schedule: every UFC, ONE and Boxing event, AFL / NBA / NFL game and ATP / WTA tournament in the next 7 days =====
+// ===== Schedule: every UFC, ONE and Boxing event, AFL / NBA / NFL game and ATP / WTA tournament in the next 14 days =====
 // Events with no official stream yet become draft rooms: named, timed and categorised, with empty stream slots the owner
 // fills in. Drafts are only shown to the owner until links are added. An event that already has an official stream
-// room above isn't drafted twice.
-const SCHED_DAYS = 7;
-const SCHED = [["UFC", "mma/ufc"], ["AFL", "australian-football/afl"], ["NBA", "basketball/nba"], ["NFL", "football/nfl"]];
+// room above isn't drafted twice. Main source is ESPN's public schedule; TheSportsDB fills in when ESPN has nothing.
+const SCHED_DAYS = Math.min(Math.max(+cfg.days_ahead || 14, 1), 21), DAY = 24 * HOUR;
 const ymd = t => new Date(t).toISOString().slice(0, 10).replace(/-/g, "");
+const dash = t => new Date(t).toISOString().slice(0, 10);
+const days = () => Array.from({ length: SCHED_DAYS + 1 }, (_, i) => Date.now() + i * DAY);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const inWindow = t => !isNaN(t) && t > Date.now() - 3 * HOUR && t < Date.now() + SCHED_DAYS * DAY;
+const SLOTS = { fight: ["Early prelims", "Prelims", "Main card"], game: ["Full game"] };
 let drafts = 0;
-for (const [cat, path] of SCHED) {
-  try {
-    const j = await get(`https://site.api.espn.com/apis/site/v2/sports/${path}/scoreboard?dates=${ymd(Date.now())}-${ymd(Date.now() + SCHED_DAYS * 24 * HOUR)}&limit=200`, "json");
-    let n = 0;
-    for (const ev of j.events || []) {
-      const c0 = (ev.competitions || [])[0] || {}, start = ev.date || c0.date, t = new Date(start).getTime();
-      if (isNaN(t) || t < Date.now() - 3 * HOUR || t > Date.now() + SCHED_DAYS * 24 * HOUR || (ev.status?.type?.state || c0.status?.type?.state) === "post") continue;
-      const fights = cat === "UFC";
-      const side = k => (c0.competitors || []).find(x => x.homeAway === k)?.team?.displayName;
-      const name = (fights ? ev.name : side("away") && side("home") ? `${side("away")} v ${side("home")}` : ev.name || ev.shortName || cat + " game").slice(0, 60);
-      if (rooms.some(r => r.cat === cat && Math.abs(new Date(r.start) - t) < 6 * HOUR && alike(r.name, name))) continue;
-      const venue = c0.venue?.fullName || c0.venue?.address?.city || "";
-      rooms.push({ id: "s" + hash(cat + ev.id).slice(0, 12), auto: true, draft: true, cat, name, topic: [cat, venue].filter(Boolean).join(" · ").slice(0, 80), start: iso(t),
-        items: (fights ? ["Main card", "Prelims"] : ["Full game"]).map(title => ({ title, url: "", backups: [] })) });
-      n++;
-    }
-    drafts += n; log(`Schedule · ${cat}: ${n} upcoming without a stream yet`);
-  } catch (e) { misses.push(`Schedule ${cat}: ${e.message}`); }
+const addDraft = (cat, key, name, t, venue, slots) => {
+  if (rooms.some(r => r.cat === cat && Math.abs(new Date(r.start) - t) < (slots === SLOTS.fight ? 12 : 6) * HOUR && alike(r.name, name))) return false;
+  rooms.push({ id: "s" + hash(cat + key).slice(0, 12), auto: true, draft: true, cat, name: name.slice(0, 60),
+    topic: [cat, venue].filter(Boolean).join(" · ").slice(0, 80), start: iso(t), items: slots.map(title => ({ title, url: "", backups: [] })) });
+  drafts++; return true;
+};
+// ESPN: try the whole date range in one call; if ESPN refuses it, ask one day at a time; last resort, its default listing.
+async function espnEvents(path) {
+  const B = `https://site.api.espn.com/apis/site/v2/sports/${path}/scoreboard`;
+  try { const j = await get(`${B}?dates=${ymd(Date.now())}-${ymd(Date.now() + SCHED_DAYS * DAY)}&limit=300`, "json"); if (j.events?.length) return { evs: j.events, how: "range" }; } catch (e) {}
+  const seen = new Map(); let ok = 0;
+  for (const d of days()) { try { const j = await get(`${B}?dates=${ymd(d)}`, "json"); ok++; for (const ev of j.events || []) seen.set(ev.id, ev); } catch (e) {} }
+  if (seen.size || ok) return { evs: [...seen.values()], how: "by day" };
+  const j = await get(B, "json"); return { evs: j.events || [], how: "default" };
 }
-// Tennis (ESPN): one room per ATP/WTA tournament running in the next 7 days. While it's on, its start rolls forward to
+// TheSportsDB: events on each day for a league (free key: 30 calls a minute, so calls are spaced out)
+const SDB = process.env.SPORTSDB_KEY || "123";
+const sdbTime = ev => { const ts = ev.strTimestamp || (ev.dateEvent && `${ev.dateEvent}T${ev.strTime || "00:00:00"}`); return ts ? new Date(ts + (/Z|[+-]\d\d:?\d\d$/.test(ts) ? "" : "Z")).getTime() : NaN; };
+async function sdbEvents(league) {
+  const seen = new Map();
+  try { const j = await get(`https://www.thesportsdb.com/api/v1/json/${SDB}/eventsnextleague.php?id=${league}`, "json"); for (const ev of j.events || []) seen.set(ev.idEvent, ev); } catch (e) {}
+  for (const d of days()) { await sleep(2100);
+    try { const j = await get(`https://www.thesportsdb.com/api/v1/json/${SDB}/eventsday.php?d=${dash(d)}&l=${league}`, "json"); for (const ev of j.events || []) seen.set(ev.idEvent, ev); } catch (e) {} }
+  return [...seen.values()];
+}
+const SDB_LEAGUE = { UFC: 4443, AFL: 4456, NBA: 4387, NFL: 4391, ONE: 4495, Boxing: 4445 };
+const fromSdb = async (cat, slots) => { let n = 0;
+  for (const ev of await sdbEvents(SDB_LEAGUE[cat])) { const t = sdbTime(ev); if (!inWindow(t)) continue;
+    const name = ev.strHomeTeam && ev.strAwayTeam && slots === SLOTS.game ? `${ev.strAwayTeam} v ${ev.strHomeTeam}` : String(ev.strEvent || cat + " event");
+    if (addDraft(cat, ev.idEvent, name, t, [ev.strVenue, ev.strCity].filter(Boolean).join(", "), slots)) n++; }
+  return n; };
+for (const [cat, path] of [["UFC", "mma/ufc"], ["AFL", "australian-football/afl"], ["NBA", "basketball/nba"], ["NFL", "football/nfl"]]) {
+  const slots = cat === "UFC" ? SLOTS.fight : SLOTS.game;
+  let n = 0, how = "";
+  try {
+    const r = await espnEvents(path); how = "ESPN " + r.how;
+    for (const ev of r.evs) {
+      const c0 = (ev.competitions || [])[0] || {}, t = new Date(ev.date || c0.date).getTime();
+      if (!inWindow(t) || (ev.status?.type?.state || c0.status?.type?.state) === "post") continue;
+      const side = k => (c0.competitors || []).find(x => x.homeAway === k)?.team?.displayName;
+      const name = slots === SLOTS.fight ? ev.name || ev.shortName || cat + " event" : side("away") && side("home") ? `${side("away")} v ${side("home")}` : ev.name || ev.shortName || cat + " game";
+      if (addDraft(cat, ev.id, String(name), t, c0.venue?.fullName || c0.venue?.address?.city || "", slots)) n++;
+    }
+  } catch (e) { misses.push(`Schedule ${cat} (ESPN): ${e.message}`); }
+  if (!n && !how.includes("range") && !how.includes("day")) { try { n += await fromSdb(cat, slots); how = "TheSportsDB"; } catch (e) { misses.push(`Schedule ${cat} (TheSportsDB): ${e.message}`); } }
+  log(`Schedule · ${cat}: ${n} upcoming without a stream yet (${how || "no source answered"})`);
+}
+// Tennis (ESPN): one room per ATP/WTA tournament running in the window. While it's on, its start rolls forward to
 // today so the draft isn't cleared mid-tournament; it drops off after the final.
 for (const tour of ["atp", "wta"]) {
   try {
-    const j = await get(`https://site.api.espn.com/apis/site/v2/sports/tennis/${tour}/scoreboard?dates=${ymd(Date.now())}-${ymd(Date.now() + SCHED_DAYS * 24 * HOUR)}`, "json");
+    const j = await get(`https://site.api.espn.com/apis/site/v2/sports/tennis/${tour}/scoreboard?dates=${ymd(Date.now())}-${ymd(Date.now() + SCHED_DAYS * DAY)}`, "json");
     let n = 0;
     for (const ev of j.events || []) {
       const s = new Date(ev.date).getTime(), end = new Date(ev.endDate || ev.date).getTime();
-      if (isNaN(s) || end < Date.now() || s > Date.now() + SCHED_DAYS * 24 * HOUR) continue;
+      if (isNaN(s) || end < Date.now() || s > Date.now() + SCHED_DAYS * DAY) continue;
       const name = `${ev.name || ev.shortName} (${tour.toUpperCase()})`.slice(0, 60);
       if (rooms.some(r => r.cat === "Tennis" && alike(r.name, name))) continue;
       const venue = ev.groupings?.[0]?.competitions?.[0]?.venue?.address?.city || "";
       rooms.push({ id: "s" + hash("Tennis" + tour + ev.id).slice(0, 12), auto: true, draft: true, cat: "Tennis", name,
         topic: ["Tennis", tour.toUpperCase(), venue].filter(Boolean).join(" · ").slice(0, 80), start: iso(Math.max(s, Date.now() - HOUR)),
         items: ["Centre court", "Outside courts"].map(title => ({ title, url: "", backups: [] })) });
-      n++;
+      n++; drafts++;
     }
-    drafts += n; log(`Schedule · Tennis ${tour.toUpperCase()}: ${n} tournaments`);
+    log(`Schedule · Tennis ${tour.toUpperCase()}: ${n} tournaments`);
   } catch (e) { misses.push(`Schedule Tennis ${tour}: ${e.message}`); }
 }
-
-// ONE and Boxing (TheSportsDB). The free key only returns the next event per league; a SPORTSDB_KEY returns more.
-for (const [cat, league] of [["ONE", 4495], ["Boxing", 4445]]) {
-  try {
-    const j = await get(`https://www.thesportsdb.com/api/v1/json/${process.env.SPORTSDB_KEY || "123"}/eventsnextleague.php?id=${league}`, "json");
-    let n = 0;
-    for (const ev of j.events || []) {
-      const ts = ev.strTimestamp || (ev.dateEvent && `${ev.dateEvent}T${ev.strTime || "00:00:00"}`);
-      const t = ts ? new Date(ts + (/Z|[+-]\d\d:?\d\d$/.test(ts) ? "" : "Z")).getTime() : NaN;
-      if (isNaN(t) || t < Date.now() - 3 * HOUR || t > Date.now() + SCHED_DAYS * 24 * HOUR) continue;
-      const name = String(ev.strEvent || cat + " event").slice(0, 60);
-      if (rooms.some(r => r.cat === cat && Math.abs(new Date(r.start) - t) < 12 * HOUR && alike(r.name, name))) continue;
-      const venue = [ev.strVenue, ev.strCity].filter(Boolean).join(", ");
-      rooms.push({ id: "s" + hash(cat + ev.idEvent).slice(0, 12), auto: true, draft: true, cat, name, topic: [cat, venue].filter(Boolean).join(" · ").slice(0, 80), start: iso(t),
-        items: ["Main card", "Prelims"].map(title => ({ title, url: "", backups: [] })) });
-      n++;
-    }
-    drafts += n; log(`Schedule · ${cat}: ${n} upcoming`);
-  } catch (e) { misses.push(`Schedule ${cat}: ${e.message}`); }
+// ONE and Boxing: TheSportsDB, day by day across the window
+for (const cat of ["ONE", "Boxing"]) {
+  try { log(`Schedule · ${cat}: ${await fromSdb(cat, SLOTS.fight)} upcoming (TheSportsDB)`); }
+  catch (e) { misses.push(`Schedule ${cat}: ${e.message}`); }
 }
-log(`${drafts} draft rooms ready for links.`);
+// Fill: a live broadcast that matches a scheduled event goes into that event's room (slot picked from its title);
+// one that matches nothing becomes its own room. Same event on several channels = backups (max 5).
+const segOf = t => /early\s*prelim/i.test(t) ? "Early prelims" : /prelim/i.test(t) ? "Prelims" : /main\s*(card|event)/i.test(t) ? "Main card" : "";
+let filled = 0;
+for (const e of found.sort((a, b) => new Date(a.start) - new Date(b.start))) {
+  const url = "https://www.youtube.com/watch?v=" + e.id, t = new Date(e.start).getTime();
+  const r = rooms.find(r => r.cat === e.cat && Math.abs(new Date(r.start) - t) < 12 * HOUR && alike(r.name, e.title));
+  if (!r) { rooms.push(roomOf(e)); continue; }
+  const want = segOf(e.title), slot = r.items.find(i => i.title === want) || r.items.find(i => i.title === "Main card" || i.title === "Full game") || r.items[0];
+  if (!slot.url) slot.url = url; else if (slot.url !== url && !slot.backups.includes(url) && slot.backups.length < MAX_BACKUPS) slot.backups.push(url);
+  if (r.draft) { delete r.draft; filled++; }
+}
+for (const r of rooms) if (!r.draft) r.items = r.items.filter(i => i.url); // a filled room only lists slots that have a stream
+log(`${drafts} event rooms from the schedule, ${filled} filled with an official live broadcast.`);
 
 log(`\n${rooms.length} event rooms from ${found.length} streams.`);
 if (misses.length) log("Channels that couldn't be read (check the handle in tools/channels.json):\n  " + misses.join("\n  "));

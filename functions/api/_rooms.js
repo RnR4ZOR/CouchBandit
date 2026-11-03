@@ -4,8 +4,13 @@ export const SKIP_KEY = "auto-skip"; // auto event rooms the owner deleted, so t
 export const MAX_AUTO_BACKUPS = 5;
 const CATS = /^[\w &+-]{1,24}$/;
 
-export const clean = list => (Array.isArray(list) ? list : []).filter(r => r && typeof r.id === "string" && /^[a-z0-9]{4,16}$/.test(r.id) && Array.isArray(r.items) && r.items.length)
-  .slice(0, 400).map(r => ({ r, d: !!(r.auto && r.draft) })).map(({ r, d }) => ({
+// Up to 600 rooms. If the list is ever over that, the furthest-away empty draft events go first; real rooms are never dropped.
+const CAP = 600;
+const capped = list => { if (list.length <= CAP) return list;
+  const drop = new Set(list.filter(r => r.auto && r.draft).sort((a, b) => String(b.start).localeCompare(String(a.start))).slice(0, list.length - CAP).map(r => r.id));
+  return list.filter(r => !drop.has(r.id)).slice(0, CAP); };
+export const clean = list => capped((Array.isArray(list) ? list : []).filter(r => r && typeof r.id === "string" && /^[a-z0-9]{4,16}$/.test(r.id) && Array.isArray(r.items) && r.items.length))
+  .map(r => ({ r, d: !!(r.auto && r.draft) })).map(({ r, d }) => ({
     id: r.id, created: +r.created || Date.now(), featured: !!r.featured,
     ...(r.auto ? { auto: true } : {}), ...(d ? { draft: true } : {}), ...(CATS.test(r.cat || "") ? { cat: r.cat } : {}),
     name: String(r.name || "Room").slice(0, 60), topic: String(r.topic || "").slice(0, 80), start: String(r.start || "").slice(0, 20),

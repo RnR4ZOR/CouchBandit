@@ -51,12 +51,11 @@ Every push to `main` that changes `public/` runs **Deploy to GitHub Pages** (`.g
 ## Event requests
 Anyone can tap **Request event**. The event's name, date/time, league and venue are filled in straight away (TheSportsDB), and the hourly event sync looks for it on the official channels only. If it finds a stream, a ready-made room (up to 5 backups) waits on the **Requests** page for the owner to approve. If not, the owner can paste their own links there; pages, embed code and video links are checked and turned into embeds, same as any room.
 
-## Matchday, My teams, best link, TV and app install
-- **My teams**: visitors tap the sports they follow and add teams or fighters. Their rooms show first on the home page with a ♥. Saved in that browser only; nothing is sent to the server.
+## Matchday, best link, TV and app install
 - **Best link picked for you**: when a room opens, every link is checked and the player switches to the best working one. A link that plays for 45 seconds is remembered on that device and tried first next time. Picking a link yourself turns this off for that visit.
 - **Matchday** (in every room): other rooms on now with one-tap switching, plus live scores and the ladder for AFL, NBA and NFL from ESPN's public feeds (`functions/api/matchday.js`, cached 60 s). Scores stay blurred until the viewer taps Show scores. UFC shows the fight card only (names, Live or Upcoming), never results.
 - **TV mode**: turns on by itself on smart TVs and TV sticks (Fire TV, Google TV, Tizen, webOS), or from Index → TV mode, or by adding `?tv=1` to the link. Remote arrows move, OK opens, Back goes back.
 - **Install app**: the site installs as an app on phones, laptops and Android TVs (Index → Install app, or Add to Home Screen on iPhone).
 
 ## Draft rooms for the week ahead
-The event sync also reads ESPN's public schedule for UFC, AFL, NBA and NFL and makes a room for every event in the next 7 days that has no official stream yet. These drafts already have the name, sport, start time and empty stream slots (UFC: Main card and Prelims). Only the owner sees them, under **Needs links** on the home page and in the Index. Open one, paste links, save, and it goes live for everyone. Drafts that never get links are cleared 12 hours after they start.
+The event sync also reads ESPN's public schedule for UFC, AFL, NBA and NFL and makes a room for every event in the next 14 days (ESPN, with TheSportsDB as backup) that has no official stream yet. These drafts already have the name, sport, start time and empty stream slots (UFC: Early prelims, Prelims and Main card). Only the owner sees them, under **Needs links** on the home page and in the Index. Open one, paste links, save, and it goes live for everyone. Drafts that never get links are cleared 12 hours after they start.
