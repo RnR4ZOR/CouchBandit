@@ -289,6 +289,12 @@ span.star{pointer-events:none}
 .find li small{grid-column:1;color:var(--muted);font-size:12px}
 .find .how{grid-row:1/3;grid-column:2;font:800 10px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:5px;white-space:nowrap}
 .find .how.emb{background:var(--good);color:#071}.find .how.tab{border:1px solid var(--line);color:var(--muted)}
+/* ===== Sport artwork: original line illustrations, no photos or likenesses ===== */
+.art{position:absolute;inset:0;width:100%;height:100%;color:var(--accent);opacity:.3;pointer-events:none}
+.art *{fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.art .f{fill:currentColor;stroke:none;opacity:.35}
+.room:hover .art{opacity:.5;transition:opacity .3s}
+.tile .art{inset:auto -8px -12px auto;width:76px;height:43px;opacity:.26}.tile:hover .art{opacity:.5}
 /* ===== Best stream pick ===== */
 .chip .pick{font:800 9px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--good);margin-left:4px}
 .chip[aria-pressed="true"] .pick{color:var(--accent-ink)}
@@ -593,6 +599,17 @@ async function verifyItems(items, say) {
 const sourcesOf = it => [it.url, ...(it.backups || [])].filter(Boolean);
 const COLORS = [["#1d1a0c", "#3d3300"], ["#121212", "#2e2a14"], ["#2a2200", "#0d0d0d"], ["#191714", "#433800"], ["#0f0f0f", "#332b05"]];
 const thumbBg = name => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const [a, b] = COLORS[h % COLORS.length]; return `repeating-linear-gradient(-45deg,rgba(255,212,0,.06) 0 10px,transparent 10px 20px),linear-gradient(${120 + h % 60}deg,${a},${b})`; };
+const ART = {
+  UFC: '<polygon points="80,10 104,20 114,45 104,70 80,80 56,70 46,45 56,20"/><polygon class="f" points="80,22 96,29 103,45 96,61 80,68 64,61 57,45 64,29"/><path d="M10 78 L46 62 M150 78 L114 62 M10 12 L46 28 M150 12 L114 28"/>',
+  Boxing: '<path d="M14 20 H146 M14 40 H146 M14 60 H146 M18 10 V76 M142 10 V76"/><circle class="f" cx="80" cy="40" r="14"/><circle cx="80" cy="40" r="14"/>',
+  AFL: '<path d="M44 78 V14 M60 78 V30 M100 78 V30 M116 78 V14"/><ellipse class="f" cx="80" cy="52" rx="20" ry="11" transform="rotate(-24 80 52)"/><ellipse cx="80" cy="52" rx="20" ry="11" transform="rotate(-24 80 52)"/><path d="M70 56 L90 48"/>',
+  NBA: '<path d="M52 14 H108 V34 H52 Z M68 34 L72 44 M92 34 L88 44 M76 44 H84"/><circle class="f" cx="80" cy="64" r="13"/><circle cx="80" cy="64" r="13"/><path d="M67 64 H93 M80 51 V77"/>',
+  NFL: '<path d="M80 80 V50 M56 12 V34 Q56 50 80 50 Q104 50 104 34 V12"/><ellipse class="f" cx="80" cy="64" rx="17" ry="9" transform="rotate(18 80 64)"/><ellipse cx="80" cy="64" rx="17" ry="9" transform="rotate(18 80 64)"/>',
+  Tennis: '<ellipse cx="64" cy="36" rx="22" ry="27" transform="rotate(-28 64 36)"/><path d="M50 18 L78 54 M62 14 L84 42 M44 30 L68 58 M40 44 L56 62 M52 30 L72 22 M46 42 L82 32 M54 54 L84 46 M72 58 L90 76"/><circle class="f" cx="118" cy="62" r="9"/><circle cx="118" cy="62" r="9"/>',
+  ONE: '<circle cx="80" cy="45" r="32"/><circle class="f" cx="80" cy="45" r="14"/><circle cx="80" cy="45" r="14"/><path d="M80 8 V20 M80 70 V82 M43 45 H55 M105 45 H117"/>',
+  _: '<circle cx="80" cy="45" r="30"/><polygon class="f" points="72,32 72,58 96,45"/><polygon points="72,32 72,58 96,45"/>'
+};
+const artFor = c => `<svg class="art" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${ART[c] || ART._}</svg>`;
 const initials = n => n.split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
 const isLive = r => r.start && new Date(r.start) <= new Date() && Date.now() - new Date(r.start) < 6 * HOUR;
 const isSoon = r => r.start && new Date(r.start) > new Date() && new Date(r.start) - Date.now() < 3 * HOUR;
@@ -834,7 +851,7 @@ function askToken() {
 function roomCard(r) {
   const p = parse(r.items[0].url);
   const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Delete room" title="Delete room">✕</button><button type="button" class="star${r.featured ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}" aria-label="${r.featured ? "Remove from featured" : "Add to featured"}">${r.featured ? "★" : "☆"}</button>` : (r.featured ? `<span class="star on" aria-hidden="true">★</span>` : "");
-  return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${r.cat ? `<b class="cattag">${esc(r.cat)}</b>` : ""}${esc(p.label || "Stream")}${r.auto ? " · auto" : ""}</span>${initials(r.name)}${isLive(r) ? `<span class="badge live">Live</span>` : isSoon(r) ? `<span class="badge soon">Soon</span>` : ""}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
+  return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}">${artFor(r.cat)}<span class="src">${r.cat ? `<b class="cattag">${esc(r.cat)}</b>` : ""}${esc(p.label || "Stream")}${r.auto ? " · auto" : ""}</span>${initials(r.name)}${isLive(r) ? `<span class="badge live">Live</span>` : isSoon(r) ? `<span class="badge soon">Soon</span>` : ""}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
     <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " stream" : " streams")))}</span></div></a></div>`;
 }
 /* Owner only: star a room to pin it in Featured on the home page */
@@ -1508,7 +1525,7 @@ function sportTiles() {
   const pool = ROOMS.filter(r => (!r.draft || isOwner) && !isArchived(r)), cats = [...new Set(pool.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
   if (!cats.length || (cats.length === 1 && cats[0] === "Other")) return "";
   return cats.map(c => { const rs = pool.filter(r => catOf(r) === c), lv = rs.filter(r => isLive(r) && !r.draft).length, nx = schedRooms(c).find(r => roomTime(r) > Date.now());
-    return `<a class="tile" href="#/sport/${encodeURIComponent(c)}"><b>${esc(c === "Other" ? "Other" : c)}</b>${lv ? `<span class="on">● ${lv} live</span>` : ""}<span>${nx ? "Next: " + esc(new Date(nx.start).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })) : rs.length + (rs.length === 1 ? " room" : " rooms")}</span></a>`; }).join("");
+    return `<a class="tile" href="#/sport/${encodeURIComponent(c)}">${artFor(c)}<b>${esc(c === "Other" ? "Other" : c)}</b>${lv ? `<span class="on">● ${lv} live</span>` : ""}<span>${nx ? "Next: " + esc(new Date(nx.start).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })) : rs.length + (rs.length === 1 ? " room" : " rooms")}</span></a>`; }).join("");
 }
 function schedulePage() {
   let sel = "all";
