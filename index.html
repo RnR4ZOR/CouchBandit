@@ -293,6 +293,11 @@ span.star{pointer-events:none}
 .art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:inherit}
 .thumb:has(.art){color:transparent;text-shadow:none}.thumb .src,.thumb .when{color:var(--ink)}.art{transition:filter .35s}.room:hover .art{filter:brightness(1.25) contrast(1.05)}
 .tile .art{inset:0;border-radius:16px;opacity:.9}.tile:hover .art{filter:brightness(1.25)}
+/* ===== Sport tabs on the home page ===== */
+.tabs{flex-wrap:nowrap;gap:2px;border-bottom:2px solid var(--line);padding-bottom:0}
+.tabs .chip{flex:none;display:flex;gap:8px;align-items:baseline;border:0;border-radius:10px 10px 0 0;background:transparent;padding:10px 16px;font-size:14px;transition:background .25s,color .25s}
+.tabs .chip:hover{background:var(--surface)}.tabs .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.tabs .chip small{font-size:11px}
 /* ===== Best stream pick ===== */
 .chip .pick{font:800 9px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--good);margin-left:4px}
 .chip[aria-pressed="true"] .pick{color:var(--accent-ink)}
@@ -359,7 +364,7 @@ body.tv .tvhint{display:flex}
   <div class="ixgrp"><span class="ixlbl">Jump to</span>
     <a class="ixgo" href="#/" data-ix data-jump="top"><b>⌂</b><span class="t">Home</span></a>
     <a class="ixgo" href="#/" data-ix data-jump="liveSec"><b>●</b><span class="t">Live now</span><em id="ixLive"></em></a>
-    <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Featured</span><em id="ixFeat"></em></a>
+    <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Starred today</span><em id="ixFeat"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="draftSec" id="ixDraftGo" hidden><b>✎</b><span class="t">Needs links</span><em id="ixDraft"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="archiveSec"><b>▤</b><span class="t">Past events</span><em id="ixPast"></em></a>
   </div>
@@ -751,8 +756,8 @@ function ixFill() {
   const act = ready().filter(r => !isArchived(r));
   n("#ixDraft", ROOMS.filter(r => r.draft).length);
   n("#ixLive", act.filter(isLive).length); n("#ixSched", schedRooms().length);
-  n("#ixFeat", ROOMS.filter(r => r.featured).length); n("#ixPast", ROOMS.filter(isArchived).length);
-  $("#ixRooms").innerHTML = act.length ? sorted(act).map(r => `<a class="ixgo" href="${roomHref(r)}" data-ix title="${esc(r.name)}"><b>${r.featured ? "★" : esc(initials(r.name))}</b><span>${esc(r.name)}</span>${isLive(r) ? `<i class="lv" aria-label="live"></i>` : ""}</a>`).join("") : `<span class="note" style="padding:8px 10px">No current rooms</span>`;
+  n("#ixFeat", ROOMS.filter(isStarred).length); n("#ixPast", ROOMS.filter(isArchived).length);
+  $("#ixRooms").innerHTML = act.length ? sorted(act).map(r => `<a class="ixgo" href="${roomHref(r)}" data-ix title="${esc(r.name)}"><b>${isStarred(r) ? "★" : esc(initials(r.name))}</b><span>${esc(r.name)}</span>${isLive(r) ? `<i class="lv" aria-label="live"></i>` : ""}</a>`).join("") : `<span class="note" style="padding:8px 10px">No current rooms</span>`;
   loadReqs().then(l => n("#ixReqN", (l || []).filter(q => !["done", "declined"].includes(q.status)).length));
   const cats = [...new Set(act.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
   $("#ixCatGrp").hidden = !cats.length;
@@ -780,7 +785,7 @@ $("#ixMenu").addEventListener("click", e => {
   const go = () => {
     if (j === "top") return scrollTo({ top: 0, behavior: "smooth" });
     const el = $("#" + j); if (el && !el.hidden) { el.scrollIntoView({ behavior: "smooth" }); el.querySelector("details")?.setAttribute("open", ""); }
-    else toast({ liveSec: "Nothing live right now. See the Schedule for what's next.", featured: "No featured rooms yet", draftSec: "No events waiting for links" }[j] || "Nothing filed there yet");
+    else toast({ liveSec: "Nothing live right now. See the Schedule for what's next.", featured: "Nothing starred today", draftSec: "No events waiting for links" }[j] || "Nothing filed there yet");
   };
   if (location.hash && location.hash !== "#/") { location.hash = "#/"; setTimeout(go, 350); } else go();
 });
@@ -856,19 +861,21 @@ function askToken() {
   });
 }
 
+/* A star lasts 24 hours from when it was given, then the room goes back to normal */
+const isStarred = r => !!r.featured && Date.now() - (+r.featuredAt || 0) < 24 * HOUR;
 function roomCard(r) {
   const p = parse(r.items[0].url);
-  const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Delete room" title="Delete room">✕</button><button type="button" class="star${r.featured ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}" aria-label="${r.featured ? "Remove from featured" : "Add to featured"}">${r.featured ? "★" : "☆"}</button>` : (r.featured ? `<span class="star on" aria-hidden="true">★</span>` : "");
+  const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Delete room" title="Delete room">✕</button><button type="button" class="star${isStarred(r) ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${isStarred(r)}" aria-label="${isStarred(r) ? "Remove star" : "Star for 24 hours"}">${isStarred(r) ? "★" : "☆"}</button>` : (isStarred(r) ? `<span class="star on" aria-hidden="true">★</span>` : "");
   return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}">${artFor(r.cat)}<span class="src">${r.cat ? `<b class="cattag">${esc(r.cat)}</b>` : ""}${esc(p.label || "Stream")}${r.auto ? " · auto" : ""}</span>${initials(r.name)}${isLive(r) ? `<span class="badge live">Live</span>` : isSoon(r) ? `<span class="badge soon">Soon</span>` : ""}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
     <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " stream" : " streams")))}</span></div></a></div>`;
 }
-/* Owner only: star a room to pin it in Featured on the home page */
+/* Owner only: star a room to pin it under "Starred today" on the home page for 24 hours */
 async function toggleStar(id) {
   if (!isOwner) return false;
   if (!ROOMS.length) await loadRooms();
   const r = byId(id); if (!r) return false;
-  const on = !r.featured; /* tap again to unstar */
-  return saveRooms(list => list.map(x => x.id === id ? { ...x, featured: on } : x), (on ? "Feature room: " : "Unfeature room: ") + r.name);
+  const on = !isStarred(r); /* tap again to unstar */
+  return saveRooms(list => list.map(x => x.id === id ? { ...x, featured: on, featuredAt: on ? Date.now() : 0 } : x), (on ? "Star room (24h): " : "Unstar room: ") + r.name);
 }
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-star]"); if (!b) return;
@@ -912,22 +919,18 @@ function home() {
     <div class="secthead"><h2>Live now</h2><a class="note" href="#/multi">Watch several at once ›</a></div>
     <div id="liveList"></div>
   </section>
-  <section id="sportSec" hidden>
-    <div class="secthead"><h2>Sports</h2><a class="note" href="#/schedule">Full schedule, next 2 weeks ›</a></div>
-    <div id="sportTiles" class="tiles"></div>
-  </section>
   <section id="featured" hidden>
-    <div class="secthead"><h2>Featured rooms</h2><span class="note">Picked by the owner</span></div>
+    <div class="secthead"><h2>Starred today</h2><span class="note">Picked by the owner · clears after 24 hours</span></div>
     <div id="featList"></div>
+  </section>
+  <section id="rooms">
+    <div class="secthead"><div style="display:grid;gap:2px"><h2>New rooms</h2><span class="note">Newest first. Pick a sport.</span></div><div class="tools"><div class="filters" id="filters" role="group" aria-label="Filter rooms"><button type="button" class="chip" data-filter="all" aria-pressed="true">All</button><button type="button" class="chip" data-filter="live" aria-pressed="false">Live</button><button type="button" class="chip" data-filter="soon" aria-pressed="false">Upcoming</button><button type="button" class="chip" data-filter="featured" aria-pressed="false">Starred</button></div><input id="roomSearch" type="search" placeholder="Search rooms" aria-label="Search rooms">${isOwner ? `<span class="note">☆ stars a room for 24 hours (tap again to unstar), ✕ deletes it</span>` : ""}</div></div>
+    <div class="filters cats tabs" id="cats" role="tablist" aria-label="Sport"></div>
+    <div id="roomList"><div class="empty">Loading rooms…</div></div>
   </section>
   <section id="recentSec" hidden>
     <div class="secthead"><h2>Jump back in</h2><span class="note">Rooms you opened on this device</span></div>
     <div id="recentList"></div>
-  </section>
-  <section id="rooms">
-    <div class="secthead"><h2>All rooms</h2><div class="tools"><div class="filters" id="filters" role="group" aria-label="Filter rooms"><button type="button" class="chip" data-filter="all" aria-pressed="true">All</button><button type="button" class="chip" data-filter="live" aria-pressed="false">Live</button><button type="button" class="chip" data-filter="soon" aria-pressed="false">Upcoming</button><button type="button" class="chip" data-filter="featured" aria-pressed="false">Featured</button></div><input id="roomSearch" type="search" placeholder="Search rooms" aria-label="Search rooms">${isOwner ? `<span class="note">☆ features a room (tap again to unfeature), ✕ deletes it</span>` : ""}</div></div>
-    <div class="filters cats" id="cats" role="group" aria-label="Sport"></div>
-    <div id="roomList"><div class="empty">Loading rooms…</div></div>
   </section>
   <section id="draftSec" hidden>
     <div class="secthead"><h2>Needs links</h2><span class="note">Events in the next 2 weeks, added automatically. Only you can see these until you add a link.</span></div>
@@ -939,20 +942,19 @@ function home() {
   </section>`;
   const paint = () => { const box = $("#roomList"); if (!box) return;
     const live = sorted(ready().filter(r => isLive(r) && !isArchived(r))); $("#liveSec").hidden = !live.length; $("#liveList").innerHTML = live.length ? `<div class="rooms">${live.map(roomCard).join("")}</div>` : "";
-    const tl = sportTiles(); $("#sportSec").hidden = !tl; $("#sportTiles").innerHTML = tl;
-    const feat = ready().filter(r => r.featured); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
+    const feat = ready().filter(isStarred); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
     const rec = recent.get().map(byId).filter(r => r && !r.draft); $("#recentSec").hidden = !rec.length; $("#recentList").innerHTML = rec.length ? `<div class="rooms">${rec.slice(0, 3).map(roomCard).join("")}</div>` : "";
     const q = ($("#roomSearch")?.value || "").trim().toLowerCase();
     const f = $("#filters [aria-pressed='true']")?.dataset.filter || "all";
-    const pass = r => f === "all" || (f === "live" && isLive(r)) || (f === "soon" && r.start && new Date(r.start) > new Date()) || (f === "featured" && r.featured);
+    const pass = r => f === "all" || (f === "live" && isLive(r)) || (f === "soon" && r.start && new Date(r.start) > new Date()) || (f === "featured" && isStarred(r));
     const arc = $("#archiveList"); const old = ready().filter(isArchived); $("#archiveSec").hidden = !old.length; arc.innerHTML = archiveHTML(old);
     paintDrafts();
     const cur = ready().filter(r => !isArchived(r)), cats = [...new Set(cur.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
     if (!cats.includes(catSel)) catSel = "all";
     $("#cats").hidden = cats.length < 2 && cats[0] === "Other";
-    $("#cats").innerHTML = ["all", ...cats].map(c => `<button type="button" class="chip" data-cat="${esc(c)}" aria-pressed="${c === catSel}">${c === "all" ? "All sports" : esc(c)}<small>${(n => n + (n === 1 ? " room" : " rooms"))(c === "all" ? cur.length : cur.filter(r => catOf(r) === c).length)}</small></button>`).join("");
-    const list = sorted(cur).filter(pass).filter(r => catSel === "all" || catOf(r) === catSel).filter(r => !q || (r.name + " " + (r.topic || "") + " " + catOf(r)).toLowerCase().includes(q));
-    const groups = catSel === "all" && cats.length > 1 ? cats.map(c => [c, list.filter(r => catOf(r) === c)]).filter(g => g[1].length) : null;
+    $("#cats").innerHTML = ["all", ...cats].map(c => `<button type="button" class="chip" role="tab" data-cat="${esc(c)}" aria-selected="${c === catSel}" aria-pressed="${c === catSel}">${c === "all" ? "All sports" : esc(c)}<small>${(n => n + (n === 1 ? " room" : " rooms"))(c === "all" ? cur.length : cur.filter(r => catOf(r) === c).length)}</small></button>`).join("");
+    const list = [...cur].sort((a, b) => (+b.created || 0) - (+a.created || 0)).filter(pass).filter(r => catSel === "all" || catOf(r) === catSel).filter(r => !q || (r.name + " " + (r.topic || "") + " " + catOf(r)).toLowerCase().includes(q));
+    const groups = null;
     box.innerHTML = !list.length ? `<div class="empty">${q || f !== "all" || catSel !== "all" ? "No rooms match that." : "No rooms yet." + (isOwner ? " Add one above." : " Check back soon.")}</div>`
       : groups ? groups.map(([c, rs]) => `<div class="catgrp"><h3 class="cathead">${esc(c === "Other" ? "Other rooms" : c)}<span>${rs.length}</span></h3><div class="rooms">${rs.map(roomCard).join("")}</div></div>`).join("")
       : `<div class="rooms">${list.map(roomCard).join("")}</div>`; };
@@ -1027,9 +1029,9 @@ async function submitRoom(form, old) {
   if (bad) { toast("This link isn't valid, check it and try again: " + bad.slice(0, 50), 6000); return; }
   const sb = form.querySelector('[type="submit"]'); sb.disabled = true; sb.textContent = "Saving…";
   await verifyItems(items, false);
-  const nr = { id: old.id || newId(), created: old.created || Date.now(), featured: !!old.featured, name: $("#ed_name").value.trim() || "Room", topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
+  const nr = { id: old.id || newId(), created: old.created || Date.now(), featured: isStarred(old), featuredAt: isStarred(old) ? old.featuredAt : 0, name: $("#ed_name").value.trim() || "Room", topic: $("#ed_topic").value.trim(), start: $("#ed_start").value, items };
   const cat = $("#ed_cat").value.trim().replace(/[^\w &+-]/g, "").slice(0, 24); if (cat) nr.cat = cat; /* an edited auto room becomes yours: the sync stops changing it */
-  const ok = await saveRooms(list => list.some(x => x.id === nr.id) ? list.map(x => x.id === nr.id ? { ...nr, featured: !!x.featured } : x) : [...list, nr], (old.id ? "Update room: " : "Add room: ") + nr.name);
+  const ok = await saveRooms(list => list.some(x => x.id === nr.id) ? list.map(x => x.id === nr.id ? { ...nr, featured: isStarred(x), featuredAt: isStarred(x) ? x.featuredAt : 0 } : x) : [...list, nr], (old.id ? "Update room: " : "Add room: ") + nr.name);
   sb.disabled = false; sb.textContent = "Save room";
   if (ok) location.hash = "#/r/" + encodeURIComponent(nr.id);
 }
@@ -1086,7 +1088,7 @@ function room(r, si, ss) {
   <a href="${esc(backTo.href)}" class="note">← ${esc(backTo.label)}</a>
   <div id="switcher">${switcherHTML(r)}</div>
   <div class="roomhead"><div style="display:grid;gap:4px"><span class="live" id="liveTag">Room open</span><h1 style="font-size:clamp(26px,4vw,40px)">${esc(r.name)}</h1><span class="note">${esc(r.topic || "")}</span></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button>${isOwner && r.id ? `<button class="btn alt" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}">${r.featured ? "★ Featured" : "☆ Feature"}</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" data-rm="${esc(r.id)}">Delete room</button>` : ""}${r.id && byId(r.id) && !r.draft ? `<a class="btn alt" href="#/multi/${encodeURIComponent(r.id)}">Multiview</a>` : ""}<button class="btn alt" id="theaterBtn" aria-pressed="false">Theater</button><button class="btn alt" id="pipBtn" hidden>Pop out</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button>${isOwner && r.id ? `<button class="btn alt" data-star="${esc(r.id)}" aria-pressed="${isStarred(r)}">${isStarred(r) ? "★ Starred (24h)" : "☆ Star for 24h"}</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" data-rm="${esc(r.id)}">Delete room</button>` : ""}${r.id && byId(r.id) && !r.draft ? `<a class="btn alt" href="#/multi/${encodeURIComponent(r.id)}">Multiview</a>` : ""}<button class="btn alt" id="theaterBtn" aria-pressed="false">Theater</button><button class="btn alt" id="pipBtn" hidden>Pop out</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
   <div class="stage" id="stage">
     <div style="display:grid;gap:12px;min-width:0">
       <div class="player" id="player"><button type="button" class="exitfs" id="exitFs">✕ Exit full screen</button><div class="statspip" id="statsPip" role="dialog" aria-label="Live fight stats" aria-live="polite"></div></div>
@@ -1527,13 +1529,6 @@ function agendaHTML(list, showCat = true) {
     return `<div class="aday${d === today ? " today" : ""}" style="animation-delay:${Math.min(i, 8) * 40}ms"><h3>${esc(head)}${d !== today ? `<small>${esc(dt.toLocaleDateString(undefined, { day: "numeric", month: "short" }))}</small>` : ""}</h3>${rs.map(r => {
       const lv = isLive(r) && !r.draft, st = r.draft ? "Needs links" : lv ? "Live" : isSoon(r) ? "Soon" : "›";
       return `<a class="slot${lv ? " live" : ""}${r.draft ? " draft" : ""}" href="${roomHref(r)}"><time>${lv ? "Now" : esc(new Date(r.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }))}</time>${showCat ? `<b class="cattag">${esc(catOf(r))}</b>` : "<span></span>"}<span class="nm"><b>${esc(r.name)}</b><small>${esc(r.topic || "")}</small></span><span class="st">${st}</span></a>`; }).join("")}</div>`; }).join("")}</div>`;
-}
-/* Sport tiles: one per sport with rooms on now, coming up, or waiting for links (owner) */
-function sportTiles() {
-  const pool = ROOMS.filter(r => (!r.draft || isOwner) && !isArchived(r)), cats = [...new Set(pool.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
-  if (!cats.length || (cats.length === 1 && cats[0] === "Other")) return "";
-  return cats.map(c => { const rs = pool.filter(r => catOf(r) === c), lv = rs.filter(r => isLive(r) && !r.draft).length, nx = schedRooms(c).find(r => roomTime(r) > Date.now());
-    return `<a class="tile" href="#/sport/${encodeURIComponent(c)}">${artFor(c)}<b>${esc(c === "Other" ? "Other" : c)}</b>${lv ? `<span class="on">● ${lv} live</span>` : ""}<span>${nx ? "Next: " + esc(new Date(nx.start).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })) : rs.length + (rs.length === 1 ? " room" : " rooms")}</span></a>`; }).join("");
 }
 function schedulePage() {
   let sel = "all";
