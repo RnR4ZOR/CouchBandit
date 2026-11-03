@@ -1,6 +1,6 @@
 // POST /api/sync {rooms:[...]} from the event sync job (tools/events-sync.mjs).
 // Adds new event rooms, updates times/titles/backups of existing auto rooms (keeping the owner's stars and edits to
-// manual rooms), never re-adds an auto room the owner deleted, and clears auto rooms 30 days after they start.
+// manual rooms), never re-adds an auto room the owner deleted, and clears only empty draft events that never got links.
 // Auth: header x-sync-key = SYNC_KEY (or OWNER_PASS if SYNC_KEY isn't set).
 import { json } from "./_auth.js";
 import { KEY, SKIP_KEY, clean } from "./_rooms.js";
@@ -28,9 +28,10 @@ export async function onRequest({ request, env }) {
       updated++;
     }
   }
-  const cutoff = Date.now() - 30 * 24 * 3600e3;
-  const stale = Date.now() - 12 * 3600e3; // drafts that never got links are cleared 12 hours after they start
-  const kept = list.filter(r => !(r.auto && r.start && new Date(r.start).getTime() < (r.draft ? stale : cutoff)));
+  // Only empty draft events that never got a link are cleared (12 hours after they start). A room with links is kept
+  // for good: it moves to Past events after 3 days and stays there until the owner deletes it.
+  const stale = Date.now() - 12 * 3600e3;
+  const kept = list.filter(r => !(r.auto && r.draft && r.start && new Date(r.start).getTime() < stale));
   await kv.put(KEY, JSON.stringify(clean(kept)));
   return json({ ok: true, added, updated, removedOld: list.length - kept.length, total: kept.length });
 }
