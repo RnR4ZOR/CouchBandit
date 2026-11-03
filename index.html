@@ -247,21 +247,48 @@ span.star{pointer-events:none}
 .ixrooms .ixgo{font-weight:600;font-size:14px;padding:8px 10px}
 .ixrooms .ixgo span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-/* ===== My teams: picked on this device only ===== */
-.mine{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:22px;padding:18px;background:linear-gradient(135deg,rgba(255,212,0,.07),transparent 55%),var(--surface);display:grid;gap:14px}
-.mine::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;border-radius:22px 0 0 22px;background:repeating-linear-gradient(180deg,var(--accent) 0 10px,transparent 10px 20px)}
-.favs{display:flex;gap:6px;flex-wrap:wrap}
-.fav{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:7px 13px;font:700 13px var(--body);cursor:pointer;transition:background .25s,border-color .25s,color .25s,transform .25s cubic-bezier(.2,.8,.2,1)}
-.fav::before{content:"♡";color:var(--muted);transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
-.fav[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.fav[aria-pressed="true"]::before{content:"♥";color:var(--coral);transform:scale(1.2)}
-.fav:active{transform:scale(.95)}
-.fav.team::after{content:"✕";font-size:11px;opacity:.6}
-.teamadd{display:flex;gap:8px;max-width:420px}
-#minePick:not([hidden]){display:grid;gap:12px}
-.priv{display:inline-flex;align-items:center;gap:6px;font:700 11px/1 ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--good)}
-.priv::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--good)}
-.room.mine-hit .thumb::after{content:"♥";position:absolute;left:10px;bottom:8px;color:var(--coral);font:16px var(--body);text-shadow:0 1px 0 #000}
+/* ===== Live strip + sport tiles (home) ===== */
+.livesec h2{display:flex;align-items:center;gap:10px}.livesec h2::before{content:"";width:12px;height:12px;border-radius:50%;background:var(--live);animation:lvp 1.8s ease-in-out infinite;box-shadow:0 0 0 4px color-mix(in srgb,var(--live) 30%,transparent)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.tile{position:relative;overflow:hidden;display:grid;gap:4px;padding:14px 14px 12px;border:1px solid var(--line);border-radius:16px;background:var(--surface);text-decoration:none;color:inherit;transition:transform .25s cubic-bezier(.2,.8,.2,1),border-color .25s}
+.tile::after{content:"";position:absolute;right:-18px;top:-18px;width:64px;height:64px;transform:rotate(45deg);background:repeating-linear-gradient(90deg,var(--accent) 0 6px,transparent 6px 12px);opacity:.14;transition:opacity .25s}
+.tile:hover,.tile:focus-visible{transform:translateY(-2px);border-color:var(--accent)}.tile:hover::after{opacity:.35}
+.tile b{font:900 26px/1 var(--display);letter-spacing:.03em;text-transform:uppercase;color:var(--accent)}
+.tile span{font-size:12px;color:var(--muted)}.tile .on{color:var(--live);font-weight:800}
+/* ===== Schedule agenda ===== */
+.agenda{display:grid;gap:18px}
+.aday{display:grid;gap:6px;animation:catIn .35s cubic-bezier(.2,.8,.2,1) both}
+.aday h3{font-size:18px;display:flex;align-items:baseline;gap:10px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.aday h3 small{font:700 11px var(--body);letter-spacing:.06em;color:var(--muted)}
+.aday.today h3{border-bottom-color:var(--accent)}.aday.today h3::before{content:"Today";font:800 10px var(--body);letter-spacing:.1em;text-transform:uppercase;background:var(--accent);color:var(--accent-ink);padding:3px 7px;border-radius:5px;align-self:center}
+.slot{display:grid;grid-template-columns:78px auto 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:inherit;background:var(--surface);transition:border-color .2s,transform .2s}
+.slot:hover,.slot:focus-visible{border-color:var(--accent);transform:translateX(3px)}
+.slot time{font:700 13px ui-monospace,monospace;color:var(--ink)}
+.slot .nm{display:grid;min-width:0}.slot .nm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.slot .nm small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot .st{font:800 10px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:5px;background:var(--raise);color:var(--muted);white-space:nowrap}
+.slot.live{border-color:color-mix(in srgb,var(--live) 55%,var(--line))}.slot.live .st{background:var(--live);color:#fff}
+.slot.draft{border-style:dashed}.slot.draft .st{background:transparent;border:1px dashed var(--accent);color:var(--accent)}
+@media(max-width:560px){.slot{grid-template-columns:62px 1fr auto}.slot .cattag{display:none}}
+/* ===== Sport front page ===== */
+.sporthero{display:grid;gap:10px;padding:22px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(120deg,rgba(255,212,0,.10),transparent 55%),var(--surface);position:relative;overflow:hidden}
+.sporthero::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:repeating-linear-gradient(-45deg,var(--accent) 0 12px,transparent 12px 24px)}
+/* ===== Multiview ===== */
+.mgrid{display:grid;gap:10px;grid-template-columns:1fr}
+.mgrid.n2,.mgrid.n3,.mgrid.n4{grid-template-columns:1fr 1fr}
+@media(max-width:700px){.mgrid.n2,.mgrid.n3,.mgrid.n4{grid-template-columns:1fr}}
+.mtile{display:grid;gap:6px;min-width:0;animation:catIn .3s cubic-bezier(.2,.8,.2,1) both}
+.mtile .player{border-width:3px;border-radius:16px}
+.mtile.aud .player{box-shadow:0 0 0 2px var(--accent),0 0 40px rgba(255,212,0,.2)}
+.mbar{display:flex;align-items:center;gap:6px;min-width:0}.mbar b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.mbar .btn{padding:5px 10px;font-size:12px}.mtile.aud [data-snd]{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.mpick{display:flex;gap:8px;flex-wrap:wrap}
+/* ===== Find legal streams (owner) ===== */
+.find{gap:12px}.find ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.find li a{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:inherit;transition:border-color .2s,transform .2s}
+.find li a:hover,.find li a:focus-visible{border-color:var(--accent);transform:translateX(2px)}
+.find li small{grid-column:1;color:var(--muted);font-size:12px}
+.find .how{grid-row:1/3;grid-column:2;font:800 10px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:5px;white-space:nowrap}
+.find .how.emb{background:var(--good);color:#071}.find .how.tab{border:1px solid var(--line);color:var(--muted)}
 /* ===== Best stream pick ===== */
 .chip .pick{font:800 9px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--good);margin-left:4px}
 .chip[aria-pressed="true"] .pick{color:var(--accent-ink)}
@@ -289,7 +316,6 @@ a.mdrow:hover,a.mdrow:focus-visible{background:var(--raise);border-color:var(--a
 .ladder th:nth-child(2),.ladder td:nth-child(2){text-align:left}
 .ladder td{padding:6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04)}
 .ladder td:first-child{color:var(--muted);width:22px}
-.ladder tr.fav td{color:var(--accent);font-weight:800}
 .ladder tr:nth-child(8) td{border-bottom:1px dashed var(--accent)}
 .ladwrap{max-height:420px;overflow-y:auto;border-radius:10px}
 /* ===== TV mode: big type, D-pad focus you can see from the couch ===== */
@@ -297,7 +323,7 @@ body.tv{font-size:19px}
 body.tv .rooms{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
 body.tv :focus-visible,body.tv :focus{outline:4px solid var(--accent);outline-offset:4px}
 body.tv .room:focus{transform:scale(1.04);border-color:var(--accent);box-shadow:var(--glow);outline:none}
-body.tv .chip,body.tv .btn,body.tv .fav{min-height:44px}
+body.tv .chip,body.tv .btn{min-height:44px}
 body.tv .tvhint{display:flex}
 .tvhint{display:none;position:fixed;right:16px;bottom:16px;z-index:6;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--muted)}
 .tvhint kbd{background:var(--raise);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink)}
@@ -319,15 +345,17 @@ body.tv .tvhint{display:flex}
   <a class="ixgo prime" href="#/new" data-ix id="ixAdd" hidden><b>+</b><span class="t">Add a room</span></a>
   <div class="ixgrp"><span class="ixlbl">Jump to</span>
     <a class="ixgo" href="#/" data-ix data-jump="top"><b>⌂</b><span class="t">Home</span></a>
-    <a class="ixgo" href="#/" data-ix data-jump="mineSec"><b>♥</b><span class="t">My teams</span><em id="ixMine"></em></a>
-    <a class="ixgo" href="#/" data-ix data-jump="live"><b>●</b><span class="t">Live now</span><em id="ixLive"></em></a>
-    <a class="ixgo" href="#/" data-ix data-jump="soon"><b>◷</b><span class="t">Upcoming</span><em id="ixSoon"></em></a>
+    <a class="ixgo" href="#/" data-ix data-jump="liveSec"><b>●</b><span class="t">Live now</span><em id="ixLive"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="featured"><b>★</b><span class="t">Featured</span><em id="ixFeat"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="draftSec" id="ixDraftGo" hidden><b>✎</b><span class="t">Needs links</span><em id="ixDraft"></em></a>
     <a class="ixgo" href="#/" data-ix data-jump="archiveSec"><b>▤</b><span class="t">Past events</span><em id="ixPast"></em></a>
   </div>
-  <a class="ixgo" href="#/sources" data-ix id="ixSrc" hidden><b>⛨</b><span class="t">Approved sources</span></a>
-  <a class="ixgo" href="#/requests" data-ix id="ixReq" hidden><b>✦</b><span class="t">Requests</span><em id="ixReqN"></em></a>
+  <div class="ixgrp"><span class="ixlbl">Browse</span>
+    <a class="ixgo" href="#/schedule" data-ix><b>▦</b><span class="t">Schedule</span><em id="ixSched"></em></a>
+    <a class="ixgo" href="#/multi" data-ix><b>⊞</b><span class="t">Multiview</span></a>
+    <a class="ixgo" href="#/requests" data-ix id="ixReq" hidden><b>✦</b><span class="t">Requests</span><em id="ixReqN"></em></a>
+    <a class="ixgo" href="#/sources" data-ix id="ixSrc" hidden><b>⛨</b><span class="t">Approved sources</span></a>
+  </div>
   <div class="ixgrp" id="ixCatGrp" hidden><span class="ixlbl">Sports</span><div id="ixCats"></div></div>
   <div class="ixgrp"><span class="ixlbl">Rooms</span><div id="ixRooms" class="ixrooms"></div></div>
   <div class="ixgrp"><span class="ixlbl">This device</span>
@@ -574,13 +602,6 @@ const sorted = list => [...list].sort((a, b) => rank(a) - rank(b) || (rank(a) ==
 /* Rooms opened on this device, newest first */
 const recent = { get() { try { return JSON.parse(localStorage.getItem("cb-recent") || "[]"); } catch (e) { return []; } },
   add(id) { if (!id) return; try { localStorage.setItem("cb-recent", JSON.stringify([id, ...recent.get().filter(x => x !== id)].slice(0, 6))); } catch (e) {} } };
-/* My teams: sports and team names picked on this device. Stored in this browser only, never sent anywhere. */
-const favs = {
-  get() { try { const v = JSON.parse(localStorage.getItem("cb-favs") || "{}"); return { cats: Array.isArray(v.cats) ? v.cats : [], teams: Array.isArray(v.teams) ? v.teams : [] }; } catch (e) { return { cats: [], teams: [] }; } },
-  set(v) { try { localStorage.setItem("cb-favs", JSON.stringify(v)); } catch (e) {} },
-  any() { const v = this.get(); return v.cats.length + v.teams.length > 0; }
-};
-const isFav = (r, v = favs.get()) => v.cats.includes(catOf(r)) || v.teams.some(t => (r.name + " " + (r.topic || "") + " " + (r.items || []).map(i => i.title).join(" ")).toLowerCase().includes(t.toLowerCase()));
 /* Best stream: links that played well on this device are tried first next time (kept on this device only) */
 const good = {
   get() { try { return JSON.parse(localStorage.getItem("cb-good") || "{}"); } catch (e) { return {}; } },
@@ -704,14 +725,13 @@ function ixFill() {
   const n = (sel, v) => { $(sel).textContent = v ? v : ""; };
   const act = ready().filter(r => !isArchived(r));
   n("#ixDraft", ROOMS.filter(r => r.draft).length);
-  n("#ixLive", act.filter(isLive).length); n("#ixSoon", act.filter(r => r.start && new Date(r.start) > new Date()).length);
+  n("#ixLive", act.filter(isLive).length); n("#ixSched", schedRooms().length);
   n("#ixFeat", ROOMS.filter(r => r.featured).length); n("#ixPast", ROOMS.filter(isArchived).length);
-  const fv = favs.get(); n("#ixMine", act.filter(r => isFav(r, fv)).length);
   $("#ixRooms").innerHTML = act.length ? sorted(act).map(r => `<a class="ixgo" href="${roomHref(r)}" data-ix title="${esc(r.name)}"><b>${r.featured ? "★" : esc(initials(r.name))}</b><span>${esc(r.name)}</span>${isLive(r) ? `<i class="lv" aria-label="live"></i>` : ""}</a>`).join("") : `<span class="note" style="padding:8px 10px">No current rooms</span>`;
   loadReqs().then(l => n("#ixReqN", (l || []).filter(q => !["done", "declined"].includes(q.status)).length));
   const cats = [...new Set(act.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
-  $("#ixCatGrp").hidden = !(cats.length > 1 || (cats[0] && cats[0] !== "Other"));
-  $("#ixCats").innerHTML = cats.map(c => `<a class="ixgo" href="#/" data-ix data-cat-jump="${esc(c)}"><b>${esc(c.slice(0, 2).toUpperCase())}</b><span class="t">${esc(c === "Other" ? "Other rooms" : c)}</span><em>${act.filter(r => catOf(r) === c).length}</em></a>`).join("");
+  $("#ixCatGrp").hidden = !cats.length;
+  $("#ixCats").innerHTML = cats.map(c => `<a class="ixgo" href="#/sport/${encodeURIComponent(c)}" data-ix><b>${esc(c.slice(0, 2).toUpperCase())}</b><span class="t">${esc(c === "Other" ? "Other rooms" : c)}</span><em>${act.filter(r => catOf(r) === c).length}</em></a>`).join("");
   [...$("#ixMenu").querySelectorAll(".ixgo")].forEach((a, i) => a.style.setProperty("--d", i));
 }
 let ixOpen = false;
@@ -730,13 +750,12 @@ $("#ixLogout").onclick = () => { ixShow(false); logout(); };
 addEventListener("keydown", e => { if (e.key === "Escape" && ixOpen) { ixShow(false); $("#menuBtn").focus(); } });
 $("#ixMenu").addEventListener("click", e => {
   const a = e.target.closest("[data-ix]"); if (!a) return; ixShow(false);
-  if (a.dataset.catJump) { e.preventDefault(); catSel = a.dataset.catJump; const goCat = () => { const b = $(`#cats [data-cat="${CSS.escape(catSel)}"]`); if (b) b.click(); $("#rooms")?.scrollIntoView({ behavior: "smooth" }); }; if ($("#roomList")) goCat(); else { location.hash = "#/"; setTimeout(goCat, 300); } return; }
   const j = a.dataset.jump; if (!j) return;
   e.preventDefault();
   const go = () => {
     if (j === "top") return scrollTo({ top: 0, behavior: "smooth" });
-    if (j === "live" || j === "soon" || j === "featured") { const b = $(`#filters [data-filter="${j}"]`); if (b) b.click(); return $("#rooms")?.scrollIntoView({ behavior: "smooth" }); }
-    const el = $("#" + j); if (el && !el.hidden) { el.scrollIntoView({ behavior: "smooth" }); el.querySelector("details")?.setAttribute("open", ""); } else toast("Nothing filed there yet");
+    const el = $("#" + j); if (el && !el.hidden) { el.scrollIntoView({ behavior: "smooth" }); el.querySelector("details")?.setAttribute("open", ""); }
+    else toast({ liveSec: "Nothing live right now. See the Schedule for what's next.", featured: "No featured rooms yet", draftSec: "No events waiting for links" }[j] || "Nothing filed there yet");
   };
   if (location.hash && location.hash !== "#/") { location.hash = "#/"; setTimeout(go, 350); } else go();
 });
@@ -815,7 +834,7 @@ function askToken() {
 function roomCard(r) {
   const p = parse(r.items[0].url);
   const owner = isOwner ? `<button type="button" class="rm" data-rm="${esc(r.id)}" aria-label="Delete room" title="Delete room">✕</button><button type="button" class="star${r.featured ? " on" : ""}" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}" aria-label="${r.featured ? "Remove from featured" : "Add to featured"}">${r.featured ? "★" : "☆"}</button>` : (r.featured ? `<span class="star on" aria-hidden="true">★</span>` : "");
-  return `<div class="roomwrap">${owner}<a class="room${isFav(r) ? " mine-hit" : ""}" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${r.cat ? `<b class="cattag">${esc(r.cat)}</b>` : ""}${esc(p.label || "Stream")}${r.auto ? " · auto" : ""}</span>${initials(r.name)}${isLive(r) ? `<span class="badge live">Live</span>` : isSoon(r) ? `<span class="badge soon">Soon</span>` : ""}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
+  return `<div class="roomwrap">${owner}<a class="room" href="${roomHref(r)}"><div class="thumb" style="background:${thumbBg(r.name)}"><span class="src">${r.cat ? `<b class="cattag">${esc(r.cat)}</b>` : ""}${esc(p.label || "Stream")}${r.auto ? " · auto" : ""}</span>${initials(r.name)}${isLive(r) ? `<span class="badge live">Live</span>` : isSoon(r) ? `<span class="badge soon">Soon</span>` : ""}${r.start ? `<span class="when">${esc(startLabel(r.start))}</span>` : ""}</div>
     <div class="meta"><h3>${esc(r.name)}</h3><span>${esc(r.topic || (r.items.length + (r.items.length === 1 ? " stream" : " streams")))}</span></div></a></div>`;
 }
 /* Owner only: star a room to pin it in Featured on the home page */
@@ -864,14 +883,13 @@ function home() {
       ${isOwner ? `<div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="#/new">Add a room</a></div>` : ""}
     </div>
   </section>
-  <section id="mineSec" class="mine">
-    <div class="secthead" style="margin:0"><div style="display:grid;gap:4px"><h2>My teams</h2><span class="priv">Saved on this device only</span></div><button type="button" class="btn alt sm" id="mineEdit" aria-expanded="false">Pick sports &amp; teams</button></div>
-    <div id="minePick" hidden>
-      <div class="favs" id="favCats" role="group" aria-label="Your sports"></div>
-      <form class="teamadd" id="teamForm"><input id="teamIn" maxlength="30" placeholder="Add a team or fighter, e.g. Crows, Volkanovski" aria-label="Team or fighter name"><button class="btn sm" type="submit">Add</button></form>
-      <div class="favs" id="favTeams" role="group" aria-label="Your teams"></div>
-    </div>
-    <div id="mineList"></div>
+  <section id="liveSec" class="livesec" hidden>
+    <div class="secthead"><h2>Live now</h2><a class="note" href="#/multi">Watch several at once ›</a></div>
+    <div id="liveList"></div>
+  </section>
+  <section id="sportSec" hidden>
+    <div class="secthead"><h2>Sports</h2><a class="note" href="#/schedule">Full schedule, next 2 weeks ›</a></div>
+    <div id="sportTiles" class="tiles"></div>
   </section>
   <section id="featured" hidden>
     <div class="secthead"><h2>Featured rooms</h2><span class="note">Picked by the owner</span></div>
@@ -887,7 +905,7 @@ function home() {
     <div id="roomList"><div class="empty">Loading rooms…</div></div>
   </section>
   <section id="draftSec" hidden>
-    <div class="secthead"><h2>Needs links</h2><span class="note">Events in the next 7 days, added automatically. Only you can see these until you add a link.</span></div>
+    <div class="secthead"><h2>Needs links</h2><span class="note">Events in the next 2 weeks, added automatically. Only you can see these until you add a link.</span></div>
     <div id="draftList" class="files"></div>
   </section>
   <section id="archiveSec" hidden>
@@ -895,8 +913,9 @@ function home() {
     <div id="archiveList" class="files"></div>
   </section>`;
   const paint = () => { const box = $("#roomList"); if (!box) return;
+    const live = sorted(ready().filter(r => isLive(r) && !isArchived(r))); $("#liveSec").hidden = !live.length; $("#liveList").innerHTML = live.length ? `<div class="rooms">${live.map(roomCard).join("")}</div>` : "";
+    const tl = sportTiles(); $("#sportSec").hidden = !tl; $("#sportTiles").innerHTML = tl;
     const feat = ready().filter(r => r.featured); $("#featured").hidden = !feat.length; $("#featList").innerHTML = feat.length ? `<div class="rooms">${feat.map(roomCard).join("")}</div>` : "";
-    paintMine();
     const rec = recent.get().map(byId).filter(r => r && !r.draft); $("#recentSec").hidden = !rec.length; $("#recentList").innerHTML = rec.length ? `<div class="rooms">${rec.slice(0, 3).map(roomCard).join("")}</div>` : "";
     const q = ($("#roomSearch")?.value || "").trim().toLowerCase();
     const f = $("#filters [aria-pressed='true']")?.dataset.filter || "all";
@@ -927,24 +946,6 @@ function home() {
       return `<details class="file" data-cat="${esc(c)}"${open.has(c) ? " open" : ""}><summary><span class="tab">${esc(c.slice(0, 5))}</span><span class="ev"><b>${esc(c)}</b><span>${rs.length} event${rs.length > 1 ? "s" : ""} · next ${fmt(roomTime(rs[0]))}</span></span><span class="chev" aria-hidden="true">›</span></summary><div class="segs">${rs.map(r =>
         `<a class="seg" href="${roomHref(r)}"><i>Add links</i><b>${esc(r.name)}</b><span class="when">${fmt(roomTime(r))}</span></a>`).join("")}</div></details>`; }).join("");
   }
-  /* My teams: tap a sport or add a team; matching rooms (live first) show at the top */
-  function paintMine() {
-    const v = favs.get(), cur = ready().filter(r => !isArchived(r));
-    const cats = [...new Set([...CATS, ...cur.map(catOf).filter(c => c !== "Other"), ...v.cats])];
-    $("#favCats").innerHTML = cats.map(c => `<button type="button" class="fav" data-fav="${esc(c)}" aria-pressed="${v.cats.includes(c)}">${esc(c)}</button>`).join("");
-    $("#favTeams").innerHTML = v.teams.map(t => `<button type="button" class="fav team" data-team="${esc(t)}" aria-pressed="true" aria-label="Remove ${esc(t)}">${esc(t)}</button>`).join("");
-    const mine = sorted(cur.filter(r => isFav(r, v)));
-    $("#mineEdit").textContent = favs.any() ? "Edit" : "Pick sports & teams";
-    if (!favs.any() && $("#minePick").hidden) $("#minePick").hidden = false;
-    $("#mineList").innerHTML = !favs.any() ? `<span class="note">Tap the sports you follow and add your teams. Their rooms show here first, live ones on top.</span>`
-      : mine.length ? `<div class="rooms">${mine.map(roomCard).join("")}</div>` : `<div class="empty">Nothing on for your teams right now.</div>`;
-  }
-  $("#mineEdit").onclick = () => { const p = $("#minePick"); p.hidden = !p.hidden; $("#mineEdit").setAttribute("aria-expanded", !p.hidden); if (!p.hidden) $("#favCats .fav")?.focus(); };
-  $("#favCats").addEventListener("click", e => { const b = e.target.closest("[data-fav]"); if (!b) return; const v = favs.get(), c = b.dataset.fav;
-    v.cats = v.cats.includes(c) ? v.cats.filter(x => x !== c) : [...v.cats, c]; favs.set(v); paint(); ixFill(); $(`#favCats [data-fav="${CSS.escape(c)}"]`)?.focus(); });
-  $("#favTeams").addEventListener("click", e => { const b = e.target.closest("[data-team]"); if (!b) return; const v = favs.get(); v.teams = v.teams.filter(x => x !== b.dataset.team); favs.set(v); paint(); ixFill(); });
-  $("#teamForm").onsubmit = e => { e.preventDefault(); const t = $("#teamIn").value.trim().replace(/[<>"]/g, "").slice(0, 30); if (!t) return;
-    const v = favs.get(); if (!v.teams.some(x => x.toLowerCase() === t.toLowerCase())) v.teams = [...v.teams, t].slice(0, 30); favs.set(v); $("#teamIn").value = ""; paint(); ixFill(); };
   $("#roomSearch").addEventListener("input", paint);
   $("#cats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; catSel = b.dataset.cat; paint(); });
   $("#filters").addEventListener("click", e => { const b = e.target.closest("[data-filter]"); if (!b) return; $("#filters").querySelectorAll("[data-filter]").forEach(x => x.setAttribute("aria-pressed", x === b)); paint(); });
@@ -969,9 +970,10 @@ const readStreams = box => [...box.querySelectorAll("[data-row]")].map((row, j) 
   backups: [...row.querySelectorAll('[data-f="backup"]')].map(i => cleanLink(i.value)).filter(Boolean)
 }));
 function bindStreams(box) {
-  const rows = box.querySelector("[data-rows]");
   box.addEventListener("click", e => {
+    const rows = box.querySelector("[data-rows]"); /* looked up on each click: the room editor is filled in after this is bound */
     const t = e.target, row = t.closest("[data-row]");
+    if (!rows) return;
     if (t.hasAttribute("data-bkadd")) { const l = row.querySelector("[data-bks]"); l.insertAdjacentHTML("beforeend", backupInput("", l.children.length)); l.lastElementChild.querySelector("input").focus(); return; }
     if (t.hasAttribute("data-bkdel")) { t.closest("[data-bk]").remove(); return; }
     if (t.hasAttribute("data-addstream")) { rows.insertAdjacentHTML("beforeend", streamRow({}, rows.children.length)); return; }
@@ -1056,10 +1058,10 @@ function room(r, si, ss) {
   let auto = !(ss != null && ss !== "");
   recent.add(r.id);
   app.innerHTML = `
-  <a href="#/" class="note">← All rooms</a>
+  <a href="${esc(backTo.href)}" class="note">← ${esc(backTo.label)}</a>
   <div id="switcher">${switcherHTML(r)}</div>
   <div class="roomhead"><div style="display:grid;gap:4px"><span class="live" id="liveTag">Room open</span><h1 style="font-size:clamp(26px,4vw,40px)">${esc(r.name)}</h1><span class="note">${esc(r.topic || "")}</span></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button>${isOwner && r.id ? `<button class="btn alt" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}">${r.featured ? "★ Featured" : "☆ Feature"}</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" data-rm="${esc(r.id)}">Delete room</button>` : ""}<button class="btn alt" id="theaterBtn" aria-pressed="false">Theater</button><button class="btn alt" id="pipBtn" hidden>Pop out</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shareBtn">Share room</button>${isOwner && r.id ? `<button class="btn alt" data-star="${esc(r.id)}" aria-pressed="${!!r.featured}">${r.featured ? "★ Featured" : "☆ Feature"}</button><button class="btn alt" id="editBtn">Edit room</button><button class="btn alt" data-rm="${esc(r.id)}">Delete room</button>` : ""}${r.id && byId(r.id) && !r.draft ? `<a class="btn alt" href="#/multi/${encodeURIComponent(r.id)}">Multiview</a>` : ""}<button class="btn alt" id="theaterBtn" aria-pressed="false">Theater</button><button class="btn alt" id="pipBtn" hidden>Pop out</button><button class="btn alt" id="fsBtn">Full screen</button></div></div>
   <div class="stage" id="stage">
     <div style="display:grid;gap:12px;min-width:0">
       <div class="player" id="player"><button type="button" class="exitfs" id="exitFs">✕ Exit full screen</button><div class="statspip" id="statsPip" role="dialog" aria-label="Live fight stats" aria-live="polite"></div></div>
@@ -1067,6 +1069,7 @@ function room(r, si, ss) {
       <div class="srcbar" id="srcbar"></div>
       <div id="countdown" class="card" hidden></div>
       <form class="card" id="editor" hidden></form>
+      <div class="card find" id="findCard" hidden></div>
     </div>
     <aside class="side">
       <div class="card"><h3>Streams</h3><ul class="queue" id="queue"></ul><span class="keys"><kbd>F</kbd> full screen · <kbd>T</kbd> theater · <kbd>B</kbd> next backup · <kbd>N</kbd> next stream</span></div>
@@ -1127,8 +1130,8 @@ function room(r, si, ss) {
   const ed = $("#editor");
   if ($("#editBtn")) {
     bindStreams(ed);
-    $("#editBtn").onclick = () => { if (ed.hidden) { ed.innerHTML = roomForm(r, "Edit room"); ed.hidden = false; ed.scrollIntoView({ behavior: "smooth", block: "start" }); } else ed.hidden = true; };
-    ed.addEventListener("click", e => { if (e.target.id === "edClose") ed.hidden = true; });
+    $("#editBtn").onclick = () => { if (ed.hidden) { ed.innerHTML = roomForm(r, "Edit room"); ed.hidden = false; findStreams(r); ed.scrollIntoView({ behavior: "smooth", block: "start" }); } else { ed.hidden = true; $("#findCard").hidden = true; } };
+    ed.addEventListener("click", e => { if (e.target.id === "edClose") { ed.hidden = true; $("#findCard").hidden = true; } });
     ed.addEventListener("submit", e => { e.preventDefault(); submitRoom(ed, r); });
   }
 
@@ -1251,7 +1254,6 @@ async function matchday(r) {
   const otherRooms = () => sorted(ready().filter(x => x.id !== r.id && !isArchived(x) && (isLive(x) || (x.start && new Date(x.start) - Date.now() < 24 * HOUR && new Date(x.start) > new Date()))))
     .sort((a, b) => (catOf(b) === cat) - (catOf(a) === cat)).slice(0, 12);
   const when = st => { const t = new Date(st); if (isNaN(t)) return ""; const today = t.toDateString() === new Date().toDateString(); return t.toLocaleString(undefined, today ? { hour: "numeric", minute: "2-digit" } : { weekday: "short", hour: "numeric", minute: "2-digit" }); };
-  const tm = favs.get().teams.map(t => t.toLowerCase()), favTeam = n => tm.some(t => String(n).toLowerCase().includes(t));
   const panes = {
     rooms() { const l = otherRooms(); return l.length ? l.map(x => `<a class="mdrow" href="${roomHref(x)}"><span class="st ${isLive(x) ? "live" : "soon"}">${isLive(x) ? "Live" : esc(when(x.start))}</span><span><b>${esc(x.name)}</b><small>${esc(catOf(x) === "Other" ? (x.topic || "Room") : catOf(x))}</small></span><span class="sc">›</span></a>`).join("") : `<div class="empty">No other rooms on right now.</div>`; },
     scores() {
@@ -1262,11 +1264,11 @@ async function matchday(r) {
       }
       const on = scoresOn();
       return `<div class="mdlbl"><span>${esc(cat)} · this round</span><button type="button" id="mdSpoil">${on ? "Hide scores" : "Show scores"}</button></div>` + g.map(x => {
-        const [a, b] = x.sides, fav = x.sides.some(s => favTeam(s.name));
-        return `<div class="mdrow"${fav ? ` style="border-color:var(--line)"` : ""}><span class="st ${x.state === "live" ? "live" : x.state === "soon" ? "soon" : ""}">${x.state === "live" ? "Live" : x.state === "done" ? "FT" : esc(when(x.start))}</span><span><b>${fav ? "♥ " : ""}${esc((a?.name || "") + " v " + (b?.name || ""))}</b>${x.state === "live" && on ? `<small>${esc(x.detail)}</small>` : ""}</span><span class="sc${on ? "" : " hid"}" aria-hidden="${!on}">${x.state === "soon" ? "" : esc((a?.score || "0") + "–" + (b?.score || "0"))}</span></div>`;
+        const [a, b] = x.sides;
+        return `<div class="mdrow"><span class="st ${x.state === "live" ? "live" : x.state === "soon" ? "soon" : ""}">${x.state === "live" ? "Live" : x.state === "done" ? "FT" : esc(when(x.start))}</span><span><b>${esc((a?.name || "") + " v " + (b?.name || ""))}</b>${x.state === "live" && on ? `<small>${esc(x.detail)}</small>` : ""}</span><span class="sc${on ? "" : " hid"}" aria-hidden="${!on}">${x.state === "soon" ? "" : esc((a?.score || "0") + "–" + (b?.score || "0"))}</span></div>`;
       }).join("");
     },
-    ladder() { return (data?.table || []).map(t => `${t.group ? `<div class="mdlbl"><span>${esc(t.group)}</span></div>` : ""}<div class="ladwrap"><table class="ladder"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>L</th><th>${cat === "AFL" ? "Pts" : "%"}</th></tr></thead><tbody>${t.rows.map((x, i) => `<tr class="${favTeam(x.team) ? "fav" : ""}"><td>${x.rank || i + 1}</td><td>${esc(x.team)}</td><td>${esc(x.p)}</td><td>${esc(x.w)}</td><td>${esc(x.l)}</td><td>${esc(x.pts)}</td></tr>`).join("")}</tbody></table></div>`).join(""); }
+    ladder() { return (data?.table || []).map(t => `${t.group ? `<div class="mdlbl"><span>${esc(t.group)}</span></div>` : ""}<div class="ladwrap"><table class="ladder"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>L</th><th>${cat === "AFL" ? "Pts" : "%"}</th></tr></thead><tbody>${t.rows.map((x, i) => `<tr><td>${x.rank || i + 1}</td><td>${esc(x.team)}</td><td>${esc(x.p)}</td><td>${esc(x.w)}</td><td>${esc(x.l)}</td><td>${esc(x.pts)}</td></tr>`).join("")}</tbody></table></div>`).join(""); }
   };
   const paint = () => {
     if (!$("#mdCard")) return;
@@ -1461,8 +1463,128 @@ async function saveSources(b) {
   } catch (e) { toast("Couldn't reach the server.", 6000); }
   finally { b.disabled = false; b.textContent = "Save sources"; }
 }
+/* ===== Find legal streams (owner): where this sport can be watched legally for free in Australia, plus one-tap
+   searches for official live broadcasts. "Embeds" = plays inside the room; "New tab" = free but the site blocks
+   embedding, so friends open it from the room's Open ↗ button. Only full events or live broadcasts belong in a room. ===== */
+const LEGAL = {
+  UFC: [["10Play", "https://10play.com.au/live", "Prelims of numbered UFC events are free on Network 10 (free 10Play account).", "tab"]],
+  NFL: [["7plus", "https://7plus.com.au/live-tv", "Seven shows NFL games free each week, plus playoffs and the Super Bowl (free 7plus account).", "tab"]],
+  AFL: [["7plus", "https://7plus.com.au/live-tv", "Seven shows AFL and AFLW games free to air (free 7plus account).", "tab"]],
+  Tennis: [["9Now", "https://www.9now.com.au/live", "Australian Open and other Nine tennis are free (free 9Now account).", "tab"]],
+  NBA: [], ONE: [], Boxing: []
+};
+const LEGAL_NOTE = { NBA: "No free legal NBA streams in Australia this season (League Pass, Kayo, Disney+ and Prime are paid). Check for an official live broadcast below.",
+  ONE: "ONE is shown exclusively by ESPN in Australia (paid). Check ONE's channel for a live broadcast that isn't blocked here.",
+  Boxing: "Most cards are paid (DAZN, Kayo, Main Event). Promoters sometimes stream undercards live on YouTube; check their Live tabs below." };
+async function findStreams(r) {
+  const box = $("#findCard"); if (!box || !isOwner) return;
+  const cat = catOf(r), q = encodeURIComponent((r.name || "") + " live");
+  let chans = []; try { const j = await (await fetch("api/sources", { cache: "no-store" })).json(); chans = j?.categories?.[cat]?.channels || []; } catch (e) {}
+  const row = (name, url, note, how) => `<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer"><b>${esc(name)} ↗</b><span class="how ${how === "emb" ? "emb" : "tab"}">${how === "emb" ? "Embeds" : "New tab"}</span><small>${esc(note)}</small></a></li>`;
+  box.innerHTML = `<h3>Find legal streams</h3><p class="note">Only full events or live broadcasts. Copy the link into a slot above; YouTube live links play inside the room.</p>
+    <ul>${row("YouTube: live now for this event", `https://www.youtube.com/results?search_query=${q}&sp=EgJAAQ%253D%253D`, "Live broadcasts only, so no clips or highlights. Use ones from official channels.", "emb")}
+    ${chans.map(h => row(`${h} live tab`, `https://www.youtube.com/${/^UC[\w-]{22}$/.test(h) ? "channel/" + h : h.replace(/^@?/, "@")}/streams`, "Your approved channel: its live and upcoming broadcasts.", "emb")).join("")}
+    ${(LEGAL[cat] || []).map(x => row(...x)).join("")}</ul>${LEGAL_NOTE[cat] ? `<p class="note">${esc(LEGAL_NOTE[cat])}</p>` : ""}`;
+  box.hidden = false;
+}
+/* ===== Where "← back" goes from a room: the page you came from (home, a sport page, the schedule or requests) ===== */
+let backTo = { href: "#/", label: "All rooms" };
+const DAYS_AHEAD = 14;
+/* Everything with a start time from 6 hours ago to 2 weeks ahead. The owner also sees events still waiting for links. */
+const schedRooms = cat => ROOMS.filter(r => (!r.draft || isOwner) && r.start && !isNaN(new Date(r.start)) && (cat == null || catOf(r) === cat)
+  && Date.now() - roomTime(r) < 6 * HOUR && roomTime(r) - Date.now() < DAYS_AHEAD * 24 * HOUR).sort((a, b) => roomTime(a) - roomTime(b));
+function agendaHTML(list, showCat = true) {
+  if (!list.length) return `<div class="empty">Nothing scheduled in the next 2 weeks yet. New events are added automatically as they're announced.</div>`;
+  const days = new Map(), today = new Date().toDateString(), tmr = new Date(Date.now() + 24 * HOUR).toDateString();
+  for (const r of list) { const d = new Date(Math.max(roomTime(r), Date.now())).toDateString(); if (!days.has(d)) days.set(d, []); days.get(d).push(r); }
+  return `<div class="agenda">${[...days].map(([d, rs], i) => { const dt = new Date(d);
+    const head = d === today ? dt.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" }) : d === tmr ? "Tomorrow" : dt.toLocaleDateString(undefined, { weekday: "long" });
+    return `<div class="aday${d === today ? " today" : ""}" style="animation-delay:${Math.min(i, 8) * 40}ms"><h3>${esc(head)}${d !== today ? `<small>${esc(dt.toLocaleDateString(undefined, { day: "numeric", month: "short" }))}</small>` : ""}</h3>${rs.map(r => {
+      const lv = isLive(r) && !r.draft, st = r.draft ? "Needs links" : lv ? "Live" : isSoon(r) ? "Soon" : "›";
+      return `<a class="slot${lv ? " live" : ""}${r.draft ? " draft" : ""}" href="${roomHref(r)}"><time>${lv ? "Now" : esc(new Date(r.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }))}</time>${showCat ? `<b class="cattag">${esc(catOf(r))}</b>` : "<span></span>"}<span class="nm"><b>${esc(r.name)}</b><small>${esc(r.topic || "")}</small></span><span class="st">${st}</span></a>`; }).join("")}</div>`; }).join("")}</div>`;
+}
+/* Sport tiles: one per sport with rooms on now, coming up, or waiting for links (owner) */
+function sportTiles() {
+  const pool = ROOMS.filter(r => (!r.draft || isOwner) && !isArchived(r)), cats = [...new Set(pool.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
+  if (!cats.length || (cats.length === 1 && cats[0] === "Other")) return "";
+  return cats.map(c => { const rs = pool.filter(r => catOf(r) === c), lv = rs.filter(r => isLive(r) && !r.draft).length, nx = schedRooms(c).find(r => roomTime(r) > Date.now());
+    return `<a class="tile" href="#/sport/${encodeURIComponent(c)}"><b>${esc(c === "Other" ? "Other" : c)}</b>${lv ? `<span class="on">● ${lv} live</span>` : ""}<span>${nx ? "Next: " + esc(new Date(nx.start).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })) : rs.length + (rs.length === 1 ? " room" : " rooms")}</span></a>`; }).join("");
+}
+function schedulePage() {
+  let sel = "all";
+  app.innerHTML = `<section style="display:grid;gap:16px"><a href="#/" class="note">← All rooms</a>
+    <div class="secthead" style="margin:0"><div style="display:grid;gap:4px"><h2>Schedule</h2><span class="note">Next 2 weeks, in your local time${isOwner ? ". Dashed rows still need links." : ""}</span></div><a class="btn alt sm" href="#/multi">⊞ Multiview</a></div>
+    <div class="filters cats" id="schCats" role="group" aria-label="Sport"></div><div id="schList"><div class="empty">Loading schedule…</div></div></section>`;
+  const paint = () => { if (!$("#schList")) return; const all = schedRooms(), cats = [...new Set(all.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
+    if (!cats.includes(sel)) sel = "all";
+    $("#schCats").hidden = cats.length < 2;
+    $("#schCats").innerHTML = ["all", ...cats].map(c => `<button type="button" class="chip" data-c="${esc(c)}" aria-pressed="${c === sel}">${c === "all" ? "All sports" : esc(c)}<small>${c === "all" ? all.length : all.filter(r => catOf(r) === c).length}</small></button>`).join("");
+    $("#schList").innerHTML = agendaHTML(sel === "all" ? all : all.filter(r => catOf(r) === sel), sel === "all"); };
+  $("#schCats").onclick = e => { const b = e.target.closest("[data-c]"); if (b) { sel = b.dataset.c; paint(); } };
+  paint(); loadRooms().then(() => { paint(); ixFill(); });
+  liveT = setInterval(() => { if (!document.hidden && $("#schList")) loadRooms().then(paint); }, 90e3);
+}
+function sportPage(cat) {
+  app.innerHTML = `<section class="sporthero"><a href="#/" class="note">← All rooms</a><h1>${esc(cat === "Other" ? "Other rooms" : cat)}</h1><p class="sub" id="spSum"></p><div class="filters" id="spOther"></div></section>
+    <section id="spLive" class="livesec" hidden><div class="secthead"><h2>Live now</h2></div><div id="spLiveList"></div></section>
+    <section><div class="secthead"><h2>Coming up</h2><span class="note">Next 2 weeks</span></div><div id="spAgenda"><div class="empty">Loading…</div></div></section>
+    <section id="spRest" hidden><div class="secthead"><h2>More rooms</h2><span class="note">No set start time</span></div><div id="spRestList"></div></section>
+    <section id="spPast" hidden><div class="secthead"><h2>Past events</h2><span class="note">Newest first</span></div><div id="spPastList" class="files"></div></section>`;
+  const paint = () => { if (!$("#spAgenda")) return;
+    const rs = ready().filter(r => catOf(r) === cat), cur = rs.filter(r => !isArchived(r)), live = sorted(cur.filter(isLive)), sch = schedRooms(cat);
+    const up = sch.filter(r => !(isLive(r) && !r.draft)), rest = cur.filter(r => !r.start);
+    $("#spSum").textContent = `${live.length} live · ${up.length} coming up in the next 2 weeks`;
+    const others = [...new Set(ROOMS.filter(r => (!r.draft || isOwner) && !isArchived(r)).map(catOf))].filter(c => c !== cat).sort((a, b) => catOrder(a) - catOrder(b));
+    $("#spOther").innerHTML = others.map(c => `<a class="chip" href="#/sport/${encodeURIComponent(c)}" style="text-decoration:none">${esc(c)}</a>`).join("") + `<a class="chip" href="#/schedule" style="text-decoration:none">All sports schedule</a>`;
+    $("#spLive").hidden = !live.length; $("#spLiveList").innerHTML = live.length ? `<div class="rooms">${live.map(roomCard).join("")}</div>` : "";
+    $("#spAgenda").innerHTML = agendaHTML(up, false);
+    $("#spRest").hidden = !rest.length; $("#spRestList").innerHTML = rest.length ? `<div class="rooms">${rest.map(roomCard).join("")}</div>` : "";
+    const old = rs.filter(isArchived); $("#spPast").hidden = !old.length; $("#spPastList").innerHTML = archiveHTML(old); };
+  paint(); loadRooms().then(() => { paint(); ixFill(); });
+  liveT = setInterval(() => { if (!document.hidden && $("#spAgenda")) loadRooms().then(paint); }, 90e3);
+}
+/* ===== Multiview: up to 4 rooms at once. One tile has sound at a time; tap Sound on another to swap. ===== */
+function multiPage(ids) {
+  const MAX = 4; let aud = 0;
+  app.innerHTML = `<section style="display:grid;gap:14px"><a href="${esc(backTo.href)}" class="note">← ${esc(backTo.label)}</a>
+    <div class="secthead" style="margin:0"><div style="display:grid;gap:4px"><h2>Multiview</h2><span class="note">Pick up to ${MAX} rooms. Only one plays sound at a time.</span></div></div>
+    <div id="mGrid" class="mgrid"></div>
+    <div class="card"><h3>Rooms</h3><div class="mpick" id="mPick"><span class="note">Loading rooms…</span></div></div></section>`;
+  const pool = () => sorted(ready().filter(r => !isArchived(r)));
+  const save = () => history.replaceState(null, "", "#/multi" + (ids.length ? "/" + ids.map(encodeURIComponent).join(",") : ""));
+  const mount = (tile, r) => {
+    const m = tile.dataset.i != aud, it = r.items[0], list = sourcesOf(it); let k = 0;
+    const play = () => { const box = tile.querySelector(".player"); box.querySelector(".layer")?._destroy?.(); const p = parse(list[k]);
+      box.innerHTML = `<div class="layer on">${playerHTML(p, m)}</div>`; const layer = box.firstChild;
+      mountVideo(layer, p, () => { if (k + 1 < list.length) { k++; play(); } }); };
+    play(); tile.classList.toggle("aud", !m);
+    tile.querySelector("[data-snd]").textContent = m ? "🔈 Sound" : "🔊 On";
+  };
+  const paintGrid = () => {
+    const g = $("#mGrid"); if (!g) return;
+    const rs = ids.map(byId).filter(r => r && !r.draft).slice(0, MAX); ids = rs.map(r => r.id); if (aud >= rs.length) aud = 0; save();
+    g.className = "mgrid n" + Math.max(1, rs.length);
+    [...g.children].forEach(t => { if (!ids.includes(t.dataset.id)) { t.querySelector(".layer")?._destroy?.(); t.remove(); } });
+    rs.forEach((r, i) => { let t = g.querySelector(`[data-id="${CSS.escape(r.id)}"]`);
+      if (!t) { g.insertAdjacentHTML("beforeend", `<div class="mtile" data-id="${esc(r.id)}"><div class="mbar"><b title="${esc(r.name)}">${isLive(r) ? `<span class="live"></span> ` : ""}${esc(r.name)}</b><button type="button" class="btn alt" data-snd>🔈 Sound</button><button type="button" class="btn alt" data-mfs aria-label="Full screen">⤢</button><a class="btn alt" href="${roomHref(r)}">Open</a><button type="button" class="btn alt" data-mx aria-label="Remove from multiview">✕</button></div><div class="player"></div></div>`);
+        t = g.lastElementChild; t.dataset.i = i; mount(t, r); }
+      else if (+t.dataset.i !== i) { const was = +t.dataset.i === aud; t.dataset.i = i; if (was !== (i === aud)) mount(t, r); g.appendChild(t); } });
+    if (!rs.length) g.innerHTML = `<div class="empty">Pick rooms below to watch them side by side.</div>`; else g.querySelector(".empty")?.remove();
+    const pl = pool(); $("#mPick").innerHTML = pl.length ? pl.map(r => `<button type="button" class="chip" data-pick="${esc(r.id)}" aria-pressed="${ids.includes(r.id)}">${esc(r.name)}<small>${isLive(r) ? "Live" : r.start ? esc(startLabel(r.start)) : esc(catOf(r))}</small></button>`).join("") : `<span class="note">No rooms to show yet.</span>`;
+  };
+  $("#mGrid").onclick = e => { const t = e.target.closest(".mtile"); if (!t) return; const r = byId(t.dataset.id);
+    if (e.target.closest("[data-mx]")) { ids = ids.filter(x => x !== t.dataset.id); return paintGrid(); }
+    if (e.target.closest("[data-mfs]")) { const pl = t.querySelector(".player"); (pl.requestFullscreen || pl.webkitRequestFullscreen)?.call(pl); return; }
+    if (e.target.closest("[data-snd]")) { const i = +t.dataset.i; if (i === aud) return; const old = $("#mGrid").querySelector(`.mtile[data-i="${aud}"]`); aud = i; if (old) mount(old, byId(old.dataset.id)); mount(t, r); }
+  };
+  $("#mPick").onclick = e => { const b = e.target.closest("[data-pick]"); if (!b) return; const id = b.dataset.pick;
+    if (ids.includes(id)) ids = ids.filter(x => x !== id); else if (ids.length >= MAX) return toast(`Up to ${MAX} rooms at once. Remove one first.`); else ids = [...ids, id];
+    paintGrid(); };
+  if (ROOMS.length) paintGrid(); loadRooms().then(() => { const g = $("#mGrid"); if (g && !g.children.length) paintGrid(); else if (g) $("#mPick") && paintGrid(); });
+}
 async function route() {
   clearInterval(timer); clearInterval(liveT); clearInterval(mdT); clearInterval(statsT); onkeydown = null; onvisibilitychange = null; app.onclick = null;
+  app.querySelectorAll(".layer").forEach(l => { try { l._destroy?.(); } catch (e) {} }); /* stop players on the page we're leaving */
   const h = location.hash || "#/";
   if (h.startsWith("#/r/")) {
     const [id, si, ss] = h.slice(4).split("/");
@@ -1470,10 +1592,13 @@ async function route() {
     room(byId(decodeURIComponent(id)), si, ss);
   }
   else if (h.startsWith("#/room/")) { const [code, si, ss] = h.slice(7).split("/"); room(dec(code), si, ss); }
-  else if (h === "#/requests") requestsPage();
+  else if (h === "#/requests") { backTo = { href: h, label: "Requests" }; requestsPage(); }
+  else if (h === "#/schedule") { backTo = { href: h, label: "Schedule" }; schedulePage(); }
+  else if (h.startsWith("#/sport/")) { const c = decodeURIComponent(h.slice(8)); backTo = { href: h, label: c === "Other" ? "Other rooms" : c }; sportPage(c); }
+  else if (h === "#/multi" || h.startsWith("#/multi/")) multiPage(h.slice(8).split(",").map(x => { try { return decodeURIComponent(x); } catch (e) { return ""; } }).filter(Boolean));
   else if (h === "#/sources") { if (isOwner || getPass()) sourcesPage(); else { home(); showLogin(); } }
   else if (h === "#/new") { if (isOwner) newRoom(); else { home(); showLogin(); } }
-  else home();
+  else { backTo = { href: "#/", label: "All rooms" }; if (h !== "#/" && h !== "#") history.replaceState(null, "", "#/"); home(); }
   window.scrollTo(0, 0);
 }
 addEventListener("hashchange", route);
