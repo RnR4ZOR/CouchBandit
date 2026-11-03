@@ -290,11 +290,9 @@ span.star{pointer-events:none}
 .find .how{grid-row:1/3;grid-column:2;font:800 10px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:5px;white-space:nowrap}
 .find .how.emb{background:var(--good);color:#071}.find .how.tab{border:1px solid var(--line);color:var(--muted)}
 /* ===== Sport artwork: original line illustrations, no photos or likenesses ===== */
-.art{position:absolute;inset:0;width:100%;height:100%;color:var(--accent);opacity:.3;pointer-events:none}
-.art *{fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
-.art .f{fill:currentColor;stroke:none;opacity:.35}
-.room:hover .art{opacity:.5;transition:opacity .3s}
-.tile .art{inset:auto -8px -12px auto;width:76px;height:43px;opacity:.26}.tile:hover .art{opacity:.5}
+.art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:inherit}
+.thumb:has(.art){color:transparent;text-shadow:none}.thumb .src,.thumb .when{color:var(--ink)}.art{transition:filter .35s}.room:hover .art{filter:brightness(1.25) contrast(1.05)}
+.tile .art{inset:0;border-radius:16px;opacity:.9}.tile:hover .art{filter:brightness(1.25)}
 /* ===== Best stream pick ===== */
 .chip .pick{font:800 9px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--good);margin-left:4px}
 .chip[aria-pressed="true"] .pick{color:var(--accent-ink)}
@@ -336,6 +334,15 @@ body.tv .tvhint{display:flex}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <radialGradient id="sph" cx=".34" cy=".28" r=".85"><stop offset="0" stop-color="#d6d6d6"/><stop offset=".3" stop-color="#8a8a8a"/><stop offset=".7" stop-color="#2a2a2a"/><stop offset="1" stop-color="#0a0a0a"/></radialGradient>
+  <linearGradient id="spot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a4a4a"/><stop offset="1" stop-color="#0c0c0c"/></linearGradient>
+  <radialGradient id="vig" cx=".5" cy=".5" r=".75"><stop offset=".45" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".85"/></radialGradient>
+  <pattern id="hatch" width="3.2" height="3.2" patternUnits="userSpaceOnUse" patternTransform="rotate(38)"><path d="M0 0 V3.2" stroke="#000" stroke-width=".9" opacity=".55"/></pattern>
+  <pattern id="mesh" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0 H5 M0 0 V5" stroke="#9a9a9a" stroke-width=".5" opacity=".55"/></pattern>
+  <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 .9  0 0 0 0 .9  0 0 0 0 .9  0 0 0 .55 -.12"/></filter>
+</defs></svg>
 <header><div class="wrap nav">
   <a class="logo" href="#/"><b></b>Couch Bandit</a>
   <a class="l" href="#/">Rooms</a>
@@ -597,19 +604,20 @@ async function verifyItems(items, say) {
   return items;
 }
 const sourcesOf = it => [it.url, ...(it.backups || [])].filter(Boolean);
-const COLORS = [["#1d1a0c", "#3d3300"], ["#121212", "#2e2a14"], ["#2a2200", "#0d0d0d"], ["#191714", "#433800"], ["#0f0f0f", "#332b05"]];
-const thumbBg = name => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const [a, b] = COLORS[h % COLORS.length]; return `repeating-linear-gradient(-45deg,rgba(255,212,0,.06) 0 10px,transparent 10px 20px),linear-gradient(${120 + h % 60}deg,${a},${b})`; };
+const COLORS = [["#101010", "#2e2e2e"], ["#171717", "#252525"], ["#0c0c0c", "#343434"], ["#141414", "#2a2a2a"], ["#0f0f0f", "#303030"]];
+const thumbBg = name => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const [a, b] = COLORS[h % COLORS.length]; return `repeating-linear-gradient(-45deg,rgba(255,255,255,.035) 0 10px,transparent 10px 20px),linear-gradient(${120 + h % 60}deg,${a},${b})`; };
 const ART = {
-  UFC: '<polygon points="80,10 104,20 114,45 104,70 80,80 56,70 46,45 56,20"/><polygon class="f" points="80,22 96,29 103,45 96,61 80,68 64,61 57,45 64,29"/><path d="M10 78 L46 62 M150 78 L114 62 M10 12 L46 28 M150 12 L114 28"/>',
-  Boxing: '<path d="M14 20 H146 M14 40 H146 M14 60 H146 M18 10 V76 M142 10 V76"/><circle class="f" cx="80" cy="40" r="14"/><circle cx="80" cy="40" r="14"/>',
-  AFL: '<path d="M44 78 V14 M60 78 V30 M100 78 V30 M116 78 V14"/><ellipse class="f" cx="80" cy="52" rx="20" ry="11" transform="rotate(-24 80 52)"/><ellipse cx="80" cy="52" rx="20" ry="11" transform="rotate(-24 80 52)"/><path d="M70 56 L90 48"/>',
-  NBA: '<path d="M52 14 H108 V34 H52 Z M68 34 L72 44 M92 34 L88 44 M76 44 H84"/><circle class="f" cx="80" cy="64" r="13"/><circle cx="80" cy="64" r="13"/><path d="M67 64 H93 M80 51 V77"/>',
-  NFL: '<path d="M80 80 V50 M56 12 V34 Q56 50 80 50 Q104 50 104 34 V12"/><ellipse class="f" cx="80" cy="64" rx="17" ry="9" transform="rotate(18 80 64)"/><ellipse cx="80" cy="64" rx="17" ry="9" transform="rotate(18 80 64)"/>',
-  Tennis: '<ellipse cx="64" cy="36" rx="22" ry="27" transform="rotate(-28 64 36)"/><path d="M50 18 L78 54 M62 14 L84 42 M44 30 L68 58 M40 44 L56 62 M52 30 L72 22 M46 42 L82 32 M54 54 L84 46 M72 58 L90 76"/><circle class="f" cx="118" cy="62" r="9"/><circle cx="118" cy="62" r="9"/>',
-  ONE: '<circle cx="80" cy="45" r="32"/><circle class="f" cx="80" cy="45" r="14"/><circle cx="80" cy="45" r="14"/><path d="M80 8 V20 M80 70 V82 M43 45 H55 M105 45 H117"/>',
-  _: '<circle cx="80" cy="45" r="30"/><polygon class="f" points="72,32 72,58 96,45"/><polygon points="72,32 72,58 96,45"/>'
+  UFC: '<polygon points="56,44 104,44 114,8 46,8" fill="url(#mesh)"/><path d="M46 8 H114 M46 8 L56 44 M114 8 L104 44" stroke="#ffd400" stroke-width="1.6" fill="none"/><polygon points="38,58 58,44 102,44 122,58 130,74 112,86 48,86 30,74" fill="url(#floor)" stroke="#ffd400" stroke-width="1.8"/><polygon points="38,58 58,44 102,44 122,58 130,74 112,86 48,86 30,74" fill="url(#hatch)"/><ellipse cx="80" cy="66" rx="22" ry="8" fill="none" stroke="#ffd400" stroke-width="1.2" opacity=".85"/><path d="M80 44 V58" stroke="#9a9a9a" stroke-width=".8"/>',
+  Boxing: '<path d="M0 22 L160 14 M0 38 L160 32 M0 54 L160 50" stroke="#8a8a8a" stroke-width="2.2" fill="none"/><path d="M150 8 V86" stroke="#ffd400" stroke-width="3"/><path d="M52 66 C38 60 38 40 50 32 C60 24 80 26 86 36 C96 34 102 44 96 52 C100 62 94 70 86 72 L84 84 H58 Z" fill="url(#sph)"/><path d="M52 66 C38 60 38 40 50 32 C60 24 80 26 86 36 C96 34 102 44 96 52 C100 62 94 70 86 72 L84 84 H58 Z" fill="url(#hatch)"/><path d="M86 36 C82 46 76 50 68 49 M58 72 H86" stroke="#050505" stroke-width="1.6" fill="none"/><path d="M58 72 H86 V84 H58 Z" fill="#121212" stroke="#ffd400" stroke-width="1.3"/><path d="M50 34 C58 28 70 28 78 31" stroke="#ffd400" stroke-width="1.5" fill="none"/>',
+  Soccer: '<path d="M30 80 V30 H110 V80" stroke="#ffd400" stroke-width="2.4" fill="none"/><path d="M30 30 H110 V80 H30 Z" fill="url(#mesh)"/><path d="M30 30 L22 20 H118 L110 30" stroke="#8a8a8a" stroke-width="1.4" fill="none"/><circle cx="104" cy="66" r="19" fill="url(#sph)"/><circle cx="104" cy="66" r="19" fill="url(#hatch)"/><polygon points="104,56 112,62 109,72 99,72 96,62" fill="#050505"/><path d="M104 56 V47 M112 62 L121 59 M109 72 L115 80 M99 72 L93 80 M96 62 L87 59" stroke="#050505" stroke-width="1.4" fill="none"/><path d="M89 55 A19 19 0 0 1 102 47" stroke="#ffd400" stroke-width="1.5" fill="none"/>',
+  AFL: '<path d="M112 88 V10 M126 88 V32 M140 88 V32 M154 88 V10" stroke="#7a7a7a" stroke-width="2.6" fill="none"/><path d="M112 10 V18 M154 10 V18 M126 32 V38 M140 32 V38" stroke="#ffd400" stroke-width="2.6" fill="none"/><g transform="rotate(-22 62 56)"><ellipse cx="62" cy="56" rx="34" ry="19" fill="url(#sph)"/><ellipse cx="62" cy="56" rx="34" ry="19" fill="url(#hatch)"/><path d="M30 56 H94 M40 46 Q62 56 40 66 M84 46 Q62 56 84 66" stroke="#050505" stroke-width="1.5" fill="none"/><path d="M52 52 V60 M58 51 V61 M64 51 V61 M70 52 V60" stroke="#ffd400" stroke-width="1.5"/><path d="M36 46 Q62 36 88 46" stroke="#ffd400" stroke-width="1.3" fill="none"/></g>',
+  NBA: '<rect x="96" y="3" width="52" height="3" fill="#8a8a8a"/><path d="M100 28 L110 58 M108 31 L114 60 M118 33 L119 62 M128 33 L124 62 M138 31 L130 60 M146 28 L134 58 M104 42 H142 M108 52 H138" stroke="#9a9a9a" stroke-width=".9" fill="none"/><ellipse cx="123" cy="28" rx="25" ry="6" fill="none" stroke="#ffd400" stroke-width="2.6"/><circle cx="58" cy="52" r="27" fill="url(#sph)"/><circle cx="58" cy="52" r="27" fill="url(#hatch)"/><path d="M31 52 H85 M58 25 V79 M40 33 Q58 52 40 71 M76 33 Q58 52 76 71" stroke="#050505" stroke-width="1.8" fill="none"/><path d="M36 38 A27 27 0 0 1 56 25" stroke="#ffd400" stroke-width="1.6" fill="none"/>',
+  NFL: '<path d="M122 88 V58 M100 14 V42 Q100 58 122 58 Q144 58 144 42 V14" stroke="#7a7a7a" stroke-width="2.8" fill="none"/><path d="M100 14 V24 M144 14 V24" stroke="#ffd400" stroke-width="2.8"/><g transform="rotate(16 62 58)"><path d="M26 58 Q62 22 98 58 Q62 94 26 58 Z" fill="url(#sph)"/><path d="M26 58 Q62 22 98 58 Q62 94 26 58 Z" fill="url(#hatch)"/><path d="M36 50 Q40 58 36 66 M88 50 Q84 58 88 66" stroke="#e0e0e0" stroke-width="1.6" fill="none"/><path d="M50 58 H74 M54 53 V63 M60 53 V63 M66 53 V63 M72 53 V63" stroke="#ffd400" stroke-width="1.6"/></g>',
+  Tennis: '<g transform="rotate(22 118 40)"><ellipse cx="118" cy="38" rx="25" ry="31" fill="url(#mesh)" stroke="#8a8a8a" stroke-width="3.4"/><path d="M118 68 V92" stroke="#6a6a6a" stroke-width="6"/><path d="M96 24 A25 31 0 0 1 112 8" stroke="#ffd400" stroke-width="1.6" fill="none"/></g><circle cx="48" cy="58" r="22" fill="url(#sph)"/><circle cx="48" cy="58" r="22" fill="url(#hatch)"/><path d="M28 48 C40 64 58 64 69 48" stroke="#ffd400" stroke-width="2" fill="none"/><path d="M30 66 C38 54 56 52 68 62" stroke="#050505" stroke-width="1.2" fill="none"/>',
+  ONE: '<ellipse cx="80" cy="66" rx="58" ry="17" fill="url(#floor)"/><ellipse cx="80" cy="66" rx="58" ry="17" fill="url(#hatch)"/><path d="M22 66 V30 M138 66 V30" stroke="#ffd400" stroke-width="2.6"/><ellipse cx="80" cy="30" rx="58" ry="14" fill="none" stroke="#8a8a8a" stroke-width="2"/><ellipse cx="80" cy="47" rx="58" ry="16" fill="none" stroke="#8a8a8a" stroke-width="2"/><ellipse cx="80" cy="66" rx="58" ry="17" fill="none" stroke="#ffd400" stroke-width="1.6"/><ellipse cx="80" cy="66" rx="18" ry="5" fill="none" stroke="#ffd400" stroke-width="1" opacity=".8"/>',
+  _: '<circle cx="80" cy="45" r="30" fill="url(#sph)"/><circle cx="80" cy="45" r="30" fill="url(#hatch)"/><polygon points="72,31 72,59 98,45" fill="none" stroke="#ffd400" stroke-width="2.4" stroke-linejoin="round"/>'
 };
-const artFor = c => `<svg class="art" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${ART[c] || ART._}</svg>`;
+const artFor = c => `<svg class="art" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M60 0 H100 L134 90 H26 Z" fill="url(#spot)"/>${ART[c] || ART._}<rect width="160" height="90" fill="url(#vig)"/><rect width="160" height="90" filter="url(#grain)" opacity=".7"/></svg>`;
 const initials = n => n.split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
 const isLive = r => r.start && new Date(r.start) <= new Date() && Date.now() - new Date(r.start) < 6 * HOUR;
 const isSoon = r => r.start && new Date(r.start) > new Date() && new Date(r.start) - Date.now() < 3 * HOUR;
@@ -639,7 +647,7 @@ function startLabel(start) {
   return t.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
 let catSel = "all";
-const CATS = ["UFC", "ONE", "Boxing", "AFL", "NBA", "NFL", "Tennis"];
+const CATS = ["UFC", "ONE", "Boxing", "AFL", "NBA", "NFL", "Soccer", "Tennis"];
 const catOf = r => r.cat || "Other";
 const catOrder = c => { const i = CATS.indexOf(c); return i < 0 ? (c === "Other" ? 99 : 50) : i; };
 /* auto event times are saved in UTC; the time picker wants local "YYYY-MM-DDTHH:mm" */
@@ -1425,7 +1433,7 @@ document.addEventListener("click", async e => {
 });
 /* ===== Approved sources (owner): the channels the event sync may search, per sport, plus up to 5 extra backup links
    per sport. Saved on the server; the sync reads it every run. ===== */
-const SRC_DEFAULT = {"categories": {"UFC": {"channels": ["@UFC"], "alts": []}, "ONE": {"channels": ["@ONEChampionship"], "alts": []}, "Boxing": {"channels": ["@MatchroomBoxing", "@TopRank", "@GoldenBoyBoxing", "@QueensberryPromotions"], "alts": []}, "AFL": {"channels": ["@AFL"], "alts": []}, "NBA": {"channels": ["@NBA"], "alts": []}, "NFL": {"channels": ["@NFL"], "alts": []}, "Tennis": {"channels": ["@ATPTour", "@WTA", "@AustralianOpen"], "alts": []}}, "days_ahead": 14, "skip_titles": "highlights|recap|full fight|best of|compilation|reaction|trailer|teaser"};
+const SRC_DEFAULT = {"categories": {"UFC": {"channels": ["@UFC"], "alts": []}, "ONE": {"channels": ["@ONEChampionship"], "alts": []}, "Boxing": {"channels": ["@MatchroomBoxing", "@TopRank", "@GoldenBoyBoxing", "@QueensberryPromotions"], "alts": []}, "AFL": {"channels": ["@AFL"], "alts": []}, "NBA": {"channels": ["@NBA"], "alts": []}, "NFL": {"channels": ["@NFL"], "alts": []}, "Soccer": {"channels": [], "alts": []}, "Tennis": {"channels": ["@ATPTour", "@WTA", "@AustralianOpen"], "alts": []}}, "days_ahead": 14, "skip_titles": "highlights|recap|full fight|best of|compilation|reaction|trailer|teaser|press conference|press conf|weigh[- ]?ins?|face[- ]?off|media day|open workout|embedded|countdown|ceremonial|fan fest|q&a|post[- ]fight"};
 let SRC = null;
 const srcRow = (v, kind) => `<li class="srcrow"><span>${esc(v)}</span><button type="button" class="btn alt sm" data-src-del="${kind}" aria-label="Remove">✕</button></li>`;
 function srcCat(name, v) {
@@ -1488,9 +1496,9 @@ const LEGAL = {
   NFL: [["7plus", "https://7plus.com.au/live-tv", "Seven shows NFL games free each week, plus playoffs and the Super Bowl (free 7plus account).", "tab"]],
   AFL: [["7plus", "https://7plus.com.au/live-tv", "Seven shows AFL and AFLW games free to air (free 7plus account).", "tab"]],
   Tennis: [["9Now", "https://www.9now.com.au/live", "Australian Open and other Nine tennis are free (free 9Now account).", "tab"]],
-  NBA: [], ONE: [], Boxing: []
+  NBA: [], ONE: [], Boxing: [], Soccer: []
 };
-const LEGAL_NOTE = { NBA: "No free legal NBA streams in Australia this season (League Pass, Kayo, Disney+ and Prime are paid). Check for an official live broadcast below.",
+const LEGAL_NOTE = { Soccer: "Most top-flight football is paid in Australia. Check 10Play's live guide for selected free matches, and official league or club YouTube live streams.", NBA: "No free legal NBA streams in Australia this season (League Pass, Kayo, Disney+ and Prime are paid). Check for an official live broadcast below.",
   ONE: "ONE is shown exclusively by ESPN in Australia (paid). Check ONE's channel for a live broadcast that isn't blocked here.",
   Boxing: "Most cards are paid (DAZN, Kayo, Main Event). Promoters sometimes stream undercards live on YouTube; check their Live tabs below." };
 async function findStreams(r) {
