@@ -11,7 +11,7 @@ const capped = list => { if (list.length <= CAP) return list;
   return list.filter(r => !drop.has(r.id)).slice(0, CAP); };
 export const clean = list => capped((Array.isArray(list) ? list : []).filter(r => r && typeof r.id === "string" && /^[a-z0-9]{4,16}$/.test(r.id) && Array.isArray(r.items) && r.items.length))
   .map(r => ({ r, d: !!(r.auto && r.draft) })).map(({ r, d }) => ({
-    id: r.id, created: +r.created || Date.now(), featured: !!r.featured,
+    id: r.id, created: +r.created || Date.now(), featured: !!r.featured && (+r.featuredAt || 0) > Date.now() - 24 * 3600e3, ...(+r.featuredAt ? { featuredAt: +r.featuredAt } : {}),
     ...(r.auto ? { auto: true } : {}), ...(d ? { draft: true } : {}), ...(CATS.test(r.cat || "") ? { cat: r.cat } : {}),
     name: String(r.name || "Room").slice(0, 60), topic: String(r.topic || "").slice(0, 80), start: String(r.start || "").slice(0, 20),
     items: r.items.slice(0, 30).map((it, j) => ({
