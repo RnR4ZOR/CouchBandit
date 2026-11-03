@@ -4,12 +4,14 @@
 // The list is kept in the ROOMS KV namespace under one key.
 import { isOwner, json } from "./_auth.js";
 import { KEY, SKIP_KEY, clean } from "./_rooms.js";
+// Fight cards starting within 8 days show to visitors as "link coming" (drafts hold no URLs).
+const showDraft = r => /^(UFC|ONE|Boxing|AFL)$/.test(r.cat || "") && r.start && new Date(r.start) - Date.now() < 8 * 864e5;
 export async function onRequest({ request, env }) {
   const kv = env.ROOMS;
   if (!kv) return json({ error: "Room storage isn't connected. Bind a KV namespace named ROOMS in Cloudflare." }, 503);
   if (request.method === "GET") { // null = never saved, [] = all rooms deleted
     const list = await kv.get(KEY, "json");
-    return json(Array.isArray(list) && !(await isOwner(request, env)) ? list.filter(r => !r.draft) : list);
+    return json(Array.isArray(list) && !(await isOwner(request, env)) ? list.filter(r => !r.draft || showDraft(r)) : list);
   }
   if (request.method === "PUT") {
     if (!(await isOwner(request, env))) return json({ error: "Log in as owner again." }, 401);

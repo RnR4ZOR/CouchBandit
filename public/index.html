@@ -923,6 +923,10 @@ function home() {
     <div class="secthead"><h2>Starred today</h2><span class="note">Picked by the owner · clears after 24 hours</span></div>
     <div id="featList"></div>
   </section>
+  <section id="soonSec" hidden>
+    <div class="secthead"><h2>Coming up</h2><a class="note" href="#/schedule">Full schedule ›</a></div>
+    <div id="soonList"></div>
+  </section>
   <section id="rooms">
     <div class="secthead"><div style="display:grid;gap:2px"><h2>New rooms</h2><span class="note">Newest first. Pick a sport.</span></div><div class="tools"><div class="filters" id="filters" role="group" aria-label="Filter rooms"><button type="button" class="chip" data-filter="all" aria-pressed="true">All</button><button type="button" class="chip" data-filter="live" aria-pressed="false">Live</button><button type="button" class="chip" data-filter="soon" aria-pressed="false">Upcoming</button><button type="button" class="chip" data-filter="featured" aria-pressed="false">Starred</button></div><input id="roomSearch" type="search" placeholder="Search rooms" aria-label="Search rooms">${isOwner ? `<span class="note">☆ stars a room for 24 hours (tap again to unstar), ✕ deletes it</span>` : ""}</div></div>
     <div class="filters cats tabs" id="cats" role="tablist" aria-label="Sport"></div>
@@ -949,6 +953,8 @@ function home() {
     const pass = r => f === "all" || (f === "live" && isLive(r)) || (f === "soon" && r.start && new Date(r.start) > new Date()) || (f === "featured" && isStarred(r));
     const arc = $("#archiveList"); const old = ready().filter(isArchived); $("#archiveSec").hidden = !old.length; arc.innerHTML = archiveHTML(old);
     paintDrafts();
+    const soon = schedRooms().filter(r => r.draft && roomTime(r) - Date.now() < 8 * 24 * HOUR && /^(UFC|ONE|Boxing|AFL)$/.test(catOf(r)));
+    $("#soonSec").hidden = !soon.length; $("#soonList").innerHTML = soon.length ? agendaHTML(soon) : "";
     const cur = ready().filter(r => !isArchived(r)), cats = [...new Set(cur.map(catOf))].sort((a, b) => catOrder(a) - catOrder(b));
     if (!cats.includes(catSel)) catSel = "all";
     $("#cats").hidden = cats.length < 2 && cats[0] === "Other";
@@ -1518,7 +1524,7 @@ async function findStreams(r) {
 let backTo = { href: "#/", label: "All rooms" };
 const DAYS_AHEAD = 14;
 /* Everything with a start time from 6 hours ago to 2 weeks ahead. The owner also sees events still waiting for links. */
-const schedRooms = cat => ROOMS.filter(r => (!r.draft || isOwner) && r.start && !isNaN(new Date(r.start)) && (cat == null || catOf(r) === cat)
+const schedRooms = cat => ROOMS.filter(r => r.start && !isNaN(new Date(r.start)) && (cat == null || catOf(r) === cat)
   && Date.now() - roomTime(r) < 6 * HOUR && roomTime(r) - Date.now() < DAYS_AHEAD * 24 * HOUR).sort((a, b) => roomTime(a) - roomTime(b));
 function agendaHTML(list, showCat = true) {
   if (!list.length) return `<div class="empty">Nothing scheduled in the next 2 weeks yet. New events are added automatically as they're announced.</div>`;
@@ -1528,6 +1534,7 @@ function agendaHTML(list, showCat = true) {
     const head = d === today ? dt.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" }) : d === tmr ? "Tomorrow" : dt.toLocaleDateString(undefined, { weekday: "long" });
     return `<div class="aday${d === today ? " today" : ""}" style="animation-delay:${Math.min(i, 8) * 40}ms"><h3>${esc(head)}${d !== today ? `<small>${esc(dt.toLocaleDateString(undefined, { day: "numeric", month: "short" }))}</small>` : ""}</h3>${rs.map(r => {
       const lv = isLive(r) && !r.draft, st = r.draft ? "Needs links" : lv ? "Live" : isSoon(r) ? "Soon" : "›";
+      if (r.draft && !isOwner) return `<div class="slot draft"><time>${esc(new Date(r.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }))}</time>${showCat ? `<b class="cattag">${esc(catOf(r))}</b>` : "<span></span>"}<span class="nm"><b>${esc(r.name)}</b><small>${esc(r.topic || "")}</small></span><span class="st">Link soon</span></div>`;
       return `<a class="slot${lv ? " live" : ""}${r.draft ? " draft" : ""}" href="${roomHref(r)}"><time>${lv ? "Now" : esc(new Date(r.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }))}</time>${showCat ? `<b class="cattag">${esc(catOf(r))}</b>` : "<span></span>"}<span class="nm"><b>${esc(r.name)}</b><small>${esc(r.topic || "")}</small></span><span class="st">${st}</span></a>`; }).join("")}</div>`; }).join("")}</div>`;
 }
 function schedulePage() {
