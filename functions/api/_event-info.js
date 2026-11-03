@@ -1,5 +1,5 @@
 // Fills in event details (official name, sport, start time, venue) from TheSportsDB's free public API.
-const CAT = [[/ufc/i, "UFC"], [/\bone\b|one championship/i, "ONE"], [/box/i, "Boxing"], [/afl|australian football/i, "AFL"], [/nba|basketball/i, "NBA"], [/nfl|american football/i, "NFL"], [/atp|wta|tennis|open/i, "Tennis"]];
+const CAT = [[/ufc/i, "UFC"], [/\bone\b|one championship/i, "ONE"], [/box/i, "Boxing"], [/afl|australian football/i, "AFL"], [/nba|basketball/i, "NBA"], [/nfl|american football/i, "NFL"], [/champions league|a-league|premier league|soccer|la liga|serie a|bundesliga|socceroos/i, "Soccer"], [/atp|wta|tennis|davis cup|billie jean|open/i, "Tennis"]];
 export const catFor = (...t) => { const s = t.filter(Boolean).join(" "); for (const [re, c] of CAT) if (re.test(s)) return c; return ""; };
 
 export async function eventInfo(q, env) {

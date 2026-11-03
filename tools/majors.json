@@ -1,0 +1,17 @@
+{
+  "_note": "Major events the sync always drafts a room for (empty slots for your links). 'start' is UTC; approx=true means the kick-off/bell time isn't published yet, so the room says 'time TBC'. 'end' (multi-day events) keeps the room alive while it's on. Dates checked 4 Nov 2026 against onefc.com, ESPN/NBA and tennis calendars. Add or delete entries freely.",
+  "events": [
+    { "cat": "ONE", "name": "ONE Friday Fights 177 + Inner Circle 37", "topic": "Lee v Ruotolo (title) · Lumpinee, Bangkok", "start": "2026-11-06T12:00:00Z", "approx": true, "slots": ["Main card"] },
+    { "cat": "ONE", "name": "ONE Fight Night 49: Gabriel v Magomedov", "topic": "ONE · Lumpinee, Bangkok", "start": "2026-11-07T02:00:00Z", "approx": true, "slots": ["Early prelims", "Prelims", "Main card"] },
+    { "cat": "ONE", "name": "ONE Friday Fights 178 + Inner Circle 38", "topic": "Rodtang v Nong-O Hama (GP quarter-final) · Bangkok", "start": "2026-11-13T12:00:00Z", "approx": true, "slots": ["Main card"] },
+    { "cat": "ONE", "name": "ONE SAMURAI 5: Pacio v Yamakita", "topic": "Strawweight MMA title · Ota, Tokyo", "start": "2026-11-18T09:00:00Z", "approx": true, "slots": ["Prelims", "Main card"] },
+    { "cat": "ONE", "name": "ONE Friday Fights 179 + Inner Circle 39", "topic": "Imangazaliev v Ortikov (Muay Thai title) · Bangkok", "start": "2026-11-20T12:00:00Z", "approx": true, "slots": ["Main card"] },
+    { "cat": "ONE", "name": "ONE Fight Night 50", "topic": "ONE · Lumpinee, Bangkok", "start": "2026-12-12T02:00:00Z", "approx": true, "slots": ["Early prelims", "Prelims", "Main card"] },
+    { "cat": "Tennis", "name": "WTA Finals (Riyadh)", "topic": "Tennis · season-ending championships", "start": "2026-11-03T00:00:00Z", "end": "2026-11-09T23:59:00Z", "approx": true, "slots": ["Centre court"] },
+    { "cat": "Tennis", "name": "ATP Finals (Turin)", "topic": "Tennis · season-ending championships", "start": "2026-11-09T00:00:00Z", "end": "2026-11-16T23:59:00Z", "approx": true, "slots": ["Centre court"] },
+    { "cat": "Tennis", "name": "Billie Jean King Cup Finals", "topic": "Tennis · national teams", "start": "2026-11-10T00:00:00Z", "end": "2026-11-16T23:59:00Z", "approx": true, "slots": ["Centre court"] },
+    { "cat": "Tennis", "name": "Davis Cup Finals", "topic": "Tennis · national teams", "start": "2026-11-18T00:00:00Z", "end": "2026-11-23T23:59:00Z", "approx": true, "slots": ["Centre court"] },
+    { "cat": "NBA", "name": "NBA Cup quarter-finals", "topic": "NBA · single-elimination, 4-5 Dec (US dates)", "start": "2026-12-05T01:00:00Z", "approx": true, "slots": ["Full game"] },
+    { "cat": "Soccer", "name": "Champions League matchday 5", "topic": "UEFA Champions League · 24-25 Nov (Europe)", "start": "2026-11-25T20:00:00Z", "approx": true, "slots": ["Full match"] }
+  ]
+}

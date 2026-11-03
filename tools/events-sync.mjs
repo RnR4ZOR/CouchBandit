@@ -18,7 +18,9 @@ try {
 } catch (e) { console.log("Using tools/channels.json (site sources not available)."); }
 const KEY = process.env.YT_API_KEY || "";
 const DAYS = cfg.days_ahead || 14, MAX_BACKUPS = 5, HOUR = 3600e3;
-const SKIP = cfg.skip_titles ? new RegExp(cfg.skip_titles, "i") : null;
+// Never worth a room, whatever the saved sources list says: press conferences, weigh-ins, face-offs and similar
+const NOISE = "press conference|press conf|weigh[- ]?ins?|face[- ]?off|media day|open workout|embedded|countdown|ceremonial|fan fest|q&a|post[- ]fight";
+const SKIP = new RegExp((cfg.skip_titles ? cfg.skip_titles + "|" : "") + NOISE, "i");
 const UA = { "user-agent": "Mozilla/5.0 (CouchBandit event sync)", "accept-language": "en-AU,en;q=0.8", cookie: "CONSENT=YES+1" };
 const log = (...a) => console.log(...a);
 
@@ -116,6 +118,7 @@ const inWindow = t => !isNaN(t) && t > Date.now() - 3 * HOUR && t < Date.now() +
 const SLOTS = { fight: ["Early prelims", "Prelims", "Main card"], game: ["Full game"] };
 let drafts = 0;
 const addDraft = (cat, key, name, t, venue, slots) => {
+  if (SKIP.test(name)) return false;
   if (rooms.some(r => r.cat === cat && Math.abs(new Date(r.start) - t) < (slots === SLOTS.fight ? 12 : 6) * HOUR && alike(r.name, name))) return false;
   rooms.push({ id: "s" + hash(cat + key).slice(0, 12), auto: true, draft: true, cat, name: name.slice(0, 60),
     topic: [cat, venue].filter(Boolean).join(" · ").slice(0, 80), start: iso(t), items: slots.map(title => ({ title, url: "", backups: [] })) });
@@ -146,7 +149,7 @@ const fromSdb = async (cat, slots) => { let n = 0;
     const name = ev.strHomeTeam && ev.strAwayTeam && slots === SLOTS.game ? `${ev.strAwayTeam} v ${ev.strHomeTeam}` : String(ev.strEvent || cat + " event");
     if (addDraft(cat, ev.idEvent, name, t, [ev.strVenue, ev.strCity].filter(Boolean).join(", "), slots)) n++; }
   return n; };
-for (const [cat, path] of [["UFC", "mma/ufc"], ["AFL", "australian-football/afl"], ["NBA", "basketball/nba"], ["NFL", "football/nfl"]]) {
+for (const [cat, path] of [["UFC", "mma/ufc"], ["AFL", "australian-football/afl"], ["NBA", "basketball/nba"], ["NFL", "football/nfl"], ["Soccer", "soccer/uefa.champions"], ["Soccer", "soccer/aus.1"], ["Soccer", "soccer/eng.1"]]) {
   const slots = cat === "UFC" ? SLOTS.fight : SLOTS.game;
   let n = 0, how = "";
   try {
@@ -182,6 +185,20 @@ for (const tour of ["atp", "wta"]) {
     log(`Schedule · Tennis ${tour.toUpperCase()}: ${n} tournaments`);
   } catch (e) { misses.push(`Schedule Tennis ${tour}: ${e.message}`); }
 }
+// Major events (tools/majors.json): ONE cards, tennis cups, NBA Cup etc. Added even if the feeds above miss them.
+try {
+  const maj = JSON.parse(await readFile(new URL("./majors.json", import.meta.url), "utf8")).events || []; let n = 0;
+  for (const m of maj) {
+    const s0 = new Date(m.start).getTime(), e0 = new Date(m.end || m.start).getTime();
+    if (isNaN(s0) || e0 < Date.now() - 3 * HOUR || s0 > Date.now() + SCHED_DAYS * DAY) continue;
+    const t = m.end ? Math.max(s0, Date.now() - HOUR) : s0, name = m.name + (m.approx && !m.end ? "" : "");
+    if (rooms.some(r => r.cat === m.cat && Math.abs(new Date(r.start) - t) < 36 * HOUR && alike(r.name, m.name))) continue;
+    rooms.push({ id: "m" + hash(m.cat + m.name).slice(0, 12), auto: true, draft: true, cat: m.cat, name: name.slice(0, 60),
+      topic: [m.topic, m.approx ? "time TBC" : ""].filter(Boolean).join(" · ").slice(0, 80), start: iso(t), items: (m.slots || ["Main card"]).map(title => ({ title, url: "", backups: [] })) });
+    n++; drafts++;
+  }
+  log(`Schedule · major events: ${n}`);
+} catch (e) { misses.push("Schedule majors: " + e.message); }
 // ONE and Boxing: TheSportsDB, day by day across the window
 for (const cat of ["ONE", "Boxing"]) {
   try { log(`Schedule · ${cat}: ${await fromSdb(cat, SLOTS.fight)} upcoming (TheSportsDB)`); }
@@ -216,7 +233,7 @@ const hdr = { "content-type": "application/json", "x-sync-key": process.env.SYNC
 const SPORTSDB = process.env.SPORTSDB_KEY || "123";
 const catGuess = (...t) => { const s = t.join(" ").toLowerCase();
   return /\bufc\b/.test(s) ? "UFC" : /\bone (championship|friday|fight)|\bone \d/.test(s) ? "ONE" : /boxing|matchroom|top rank|golden boy|queensberry|no limit/.test(s) ? "Boxing"
-    : /\bafl\b|aussie rules|australian football/.test(s) ? "AFL" : /\bnba\b|basketball/.test(s) ? "NBA" : /\bnfl\b|american football/.test(s) ? "NFL" : /tennis|\batp\b|\bwta\b|open/.test(s) ? "Tennis" : ""; };
+    : /\bafl\b|aussie rules|australian football/.test(s) ? "AFL" : /\bnba\b|basketball/.test(s) ? "NBA" : /\bnfl\b|american football/.test(s) ? "NFL" : /champions league|a-league|premier league|soccer|la liga|serie a|bundesliga|socceroos/.test(s) ? "Soccer" : /tennis|\batp\b|\bwta\b|davis cup|billie jean|open/.test(s) ? "Tennis" : ""; };
 async function eventInfo(q) {
   try {
     const j = await get(`https://www.thesportsdb.com/api/v1/json/${SPORTSDB}/searchevents.php?e=${encodeURIComponent(q.replace(/\s+/g, "_"))}`, "json");

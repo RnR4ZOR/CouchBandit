@@ -1,7 +1,7 @@
 {
   "_note": "Official channels Couch Bandit watches for scheduled live streams. Add or remove handles freely. 'alts' are extra official links (e.g. a Twitch channel) added as backups. Max 5 backups per event.",
   "days_ahead": 14,
-  "skip_titles": "highlights|recap|full fight|best of|compilation|reaction|trailer|teaser",
+  "skip_titles": "highlights|recap|full fight|best of|compilation|reaction|trailer|teaser|press conference|press conf|weigh[- ]?ins?|face[- ]?off|media day|open workout|embedded|countdown|ceremonial|fan fest|q&a|post[- ]fight",
   "categories": {
     "UFC": [
       {
@@ -85,6 +85,7 @@
       {
         "handle": "@TennisTV"
       }
-    ]
+    ],
+    "Soccer": []
   }
 }
